@@ -94,4 +94,9 @@ ENV PATH="${UV_PROJECT_ENVIRONMENT}/bin:${PATH}"
 # there. Some packages such as matplotlib, want to write to the home folder.
 RUN chown -R user:user ${HOME}
 
-ENTRYPOINT ["fact"]
+# Run the FastAPI application using uvicorn
+CMD ["uvicorn", "unk029.main:app", "--host", "0.0.0.0", "--port", "8001"]
+
+USER user
+
+

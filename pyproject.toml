@@ -1,8 +1,8 @@
 [project]
-name = "fact"
+name = "unk029"
 # version = "1.0.0"
 dynamic = ["version"]
-description = "Example Python project using best practices"
+description = "Bank App - FastAPI application with best practices"
 authors = [
     { name = "John Hagen", email = "johnthagen@users.noreply.github.com" }]
 license = "MIT"
@@ -26,17 +26,20 @@ classifiers = [
 ]
 requires-python = "==3.12.*"
 dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "oracledb",
     "rich",
     "typer-slim[standard]"
 ]
 
 [project.urls]
-Homepage = "https://github.com/johnthagen/python-blueprint"
-Documentation = "https://johnthagen.github.io/python-blueprint/"
-Repository = "https://github.com/johnthagen/python-blueprint"
+Homepage = "https://github.com/unk029-openconsultinguk/unk029_bank_app"
+Documentation = "https://github.com/unk029-openconsultinguk/unk029_bank_app"
+Repository = "https://github.com/unk029-openconsultinguk/unk029_bank_app"
 
-[project.scripts]
-fact = "fact.cli:app"
+#[project.scripts]
+#unk029 = "unk029.cli:app"
 
 [dependency-groups]
 nox = [
@@ -73,14 +76,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
-path = "src/fact/__about__.py"
+path = "src/unk029/__about__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/fact", "codeenigma_runtime"]
+packages = ["src/unk029"]
 
 [tool.poetry]
-name = "fact"
-version = "0.0.1"
+name = "unk029"
+version = "0.1.0"
 
 
 # For non-src directory projects, explicitly set top level model name:
