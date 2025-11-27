@@ -1,44 +1,22 @@
-"""FastAPI application for Bank App."""
-
 from fastapi import FastAPI
-from unk029 import add
+from unk029 import accounts
 
-app = FastAPI(
-    title="Bank App API",
-    description="A simple bank app API with FastAPI",
-    version="0.1.0",
-)
+app = FastAPI()
 
 
-@app.get("/")
-def read_root():
-    """Root endpoint."""
-    return {"message": "Welcome to Bank App API"}
 
+@app.get("/account/{account_no}")
+def get_account(account_no: int):
+    return accounts.get_account(account_no)
 
-@app.get("/add")
-def add_numbers(a: int, b: int):
-    """Add two numbers together.
-    
-    Parameters:
-    - a: First number
-    - b: Second number
-    
-    Returns:
-    - result: Sum of a and b
-    """
-    return {"result": add(a, b)}
+@app.post("/account")
+def create_account(account: accounts.AccountCreate):
+    return accounts.create_account(account)
 
+@app.patch("/account/{account_no}/topup")
+def topup_account(account_no: int, topup: accounts.TopUp):
+    return accounts.topup_account(account_no, topup)
 
-@app.get("/balance/{account_id}")
-def get_balance(account_id: int):
-    """Get account balance (placeholder).
-    
-    Parameters:
-    - account_id: The account ID
-    
-    Returns:
-    - account_id: The requested account ID
-    - balance: The account balance
-    """
-    return {"account_id": account_id, "balance": 1000.00}
+@app.patch("/account/{account_no}/withdraw")
+def withdraw_account(account_no: int, withdraw: accounts.WithDraw):
+    return accounts.withdraw_account(account_no, withdraw)
