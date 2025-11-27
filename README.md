@@ -1,3 +1,55 @@
+# unk029 Bank App
+
+A production-ready FastAPI application for a simple bank system, using Oracle Autonomous DB, Docker, and Nginx with SSL.
+
+## Features
+- Account creation, top-up, withdraw, and balance endpoints
+- Oracle Autonomous DB integration
+- Dockerized app and Nginx reverse proxy
+- SSL support for secure deployment
+- Environment variables for secrets
+
+## Project Structure
+```
+unk029_bank_app/
+├── src/
+│   ├── main.py         # FastAPI entrypoint
+│   └── unk029/
+│       ├── __init__.py
+│       ├── accounts.py # All account logic and DB access
+│       └── ...
+├── docker-compose.yml
+├── Dockerfile
+├── nginx.conf
+├── .env
+├── .gitignore
+└── README.md
+```
+
+## Quick Start
+1. Clone the repo and set up your `.env` with Oracle DB credentials.
+2. Place your Oracle wallet files in the `wallet/` directory.
+3. Build and run with Docker Compose:
+   ```bash
+   docker compose up --build
+   ```
+4. Access the API docs at `https://<your-domain>/docs`.
+
+## Endpoints
+- `GET /account/{account_no}`: Get account details
+- `POST /account`: Create a new account
+- `PATCH /account/{account_no}/topup`: Top up account
+- `PATCH /account/{account_no}/withdraw`: Withdraw from account
+
+## Security
+- Secrets are loaded from `.env`
+- Oracle wallet is mounted read-only in the container
+- SSL is handled by Nginx
+
+## License
+MIT
+
+
 # python-blueprint
 
 [![GitHub Actions][github-actions-badge]](https://github.com/johnthagen/python-blueprint/actions)
