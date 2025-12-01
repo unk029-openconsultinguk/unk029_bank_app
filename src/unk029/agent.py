@@ -98,7 +98,7 @@ def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
             }
             
             # Send request to MCP Server
-            response = client.post(mcp_url, json=request_payload)
+            response = client.post(mcp_url, json=request_payload, follow_redirects=True)
             
             print(f"DEBUG: MCP response status: {response.status_code}", flush=True)
             print(f"DEBUG: MCP response: {response.text}", flush=True)
@@ -248,9 +248,11 @@ Respond in a friendly and helpful manner."""
                 response = chat.send_message(
                     genai.protos.Content(
                         parts=[
-                            genai.protos.Part.from_function_response(
-                                name=tool_name,
-                                response=tool_result
+                            genai.protos.Part(
+                                function_response=genai.protos.FunctionResponse(
+                                    name=tool_name,
+                                    response=tool_result
+                                )
                             )
                         ]
                     )
