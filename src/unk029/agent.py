@@ -57,61 +57,6 @@ def _get_session_key(request: Request) -> str:
     return request.client.host if request and request.client else "default"
 
 
-# MCP Tool Definitions for Gemini
-BANKING_TOOLS = [
-    {
-        "name": "get_account_info",
-        "description": "Get account information including balance, name, and account number",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "account_no": {
-                    "type": "integer",
-                    "description": "The account number to query"
-                }
-            },
-            "required": ["account_no"]
-        }
-    },
-    {
-        "name": "deposit_funds",
-        "description": "Deposit funds into a bank account",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "account_no": {
-                    "type": "integer",
-                    "description": "The account number to deposit to"
-                },
-                "amount": {
-                    "type": "number",
-                    "description": "The amount to deposit in GBP"
-                }
-            },
-            "required": ["account_no", "amount"]
-        }
-    },
-    {
-        "name": "withdraw_funds",
-        "description": "Withdraw funds from a bank account",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "account_no": {
-                    "type": "integer",
-                    "description": "The account number to withdraw from"
-                },
-                "amount": {
-                    "type": "number",
-                    "description": "The amount to withdraw in GBP"
-                }
-            },
-            "required": ["account_no", "amount"]
-        }
-    }
-]
-
-
 def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
     """
     Call MCP Server tools via HTTP.
@@ -212,7 +157,62 @@ Respond in a friendly and helpful manner."""
         # Create Gemini model with tools
         model = genai.GenerativeModel(
             "gemini-2.5-flash",
-            tools=BANKING_TOOLS,
+            tools=[
+                genai.protos.Tool(
+                    function_declarations=[
+                        genai.protos.FunctionDeclaration(
+                            name="get_account_info",
+                            description="Get account information including balance, name, and account number",
+                            parameters=genai.protos.Schema(
+                                type_="OBJECT",
+                                properties={
+                                    "account_no": genai.protos.Schema(
+                                        type_="INTEGER",
+                                        description="The account number to query"
+                                    )
+                                },
+                                required=["account_no"]
+                            )
+                        ),
+                        genai.protos.FunctionDeclaration(
+                            name="deposit_funds",
+                            description="Deposit funds into a bank account",
+                            parameters=genai.protos.Schema(
+                                type_="OBJECT",
+                                properties={
+                                    "account_no": genai.protos.Schema(
+                                        type_="INTEGER",
+                                        description="The account number to deposit to"
+                                    ),
+                                    "amount": genai.protos.Schema(
+                                        type_="NUMBER",
+                                        description="The amount to deposit in GBP"
+                                    )
+                                },
+                                required=["account_no", "amount"]
+                            )
+                        ),
+                        genai.protos.FunctionDeclaration(
+                            name="withdraw_funds",
+                            description="Withdraw funds from a bank account",
+                            parameters=genai.protos.Schema(
+                                type_="OBJECT",
+                                properties={
+                                    "account_no": genai.protos.Schema(
+                                        type_="INTEGER",
+                                        description="The account number to withdraw from"
+                                    ),
+                                    "amount": genai.protos.Schema(
+                                        type_="NUMBER",
+                                        description="The amount to withdraw in GBP"
+                                    )
+                                },
+                                required=["account_no", "amount"]
+                            )
+                        ),
+                    ]
+                )
+            ],
             system_instruction=system_prompt
         )
         
