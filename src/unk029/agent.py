@@ -114,7 +114,8 @@ BANKING_TOOLS = [
 
 def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
     """
-    Call MCP Server tool via JSON-RPC protocol.
+    Call MCP Server tools via HTTP.
+    Agent communicates with MCP Server to execute banking operations.
     
     Args:
         tool_name: Name of the tool (get_account_info, deposit_funds, withdraw_funds)
@@ -127,7 +128,9 @@ def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
         with httpx.Client(timeout=10.0) as client:
             mcp_url = "http://unk029_mcp_server:8002/mcp"
             
-            # Map Gemini tool names to MCP tool names
+            print(f"DEBUG: Calling MCP tool {tool_name} with input: {tool_input}", flush=True)
+            
+            # Map tool names to MCP tool names
             mcp_tool_map = {
                 "get_account_info": "get_account_tool",
                 "deposit_funds": "topup_account_tool",
@@ -137,8 +140,6 @@ def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
             mcp_tool_name = mcp_tool_map.get(tool_name)
             if not mcp_tool_name:
                 return {"error": f"Unknown tool: {tool_name}"}
-            
-            print(f"DEBUG: Calling MCP tool {mcp_tool_name} with input: {tool_input}", flush=True)
             
             # Prepare JSON-RPC request for the MCP tool
             request_payload = {
@@ -155,6 +156,7 @@ def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
             response = client.post(mcp_url, json=request_payload)
             
             print(f"DEBUG: MCP response status: {response.status_code}", flush=True)
+            print(f"DEBUG: MCP response: {response.text}", flush=True)
             
             if response.status_code == 200:
                 result = response.json()
