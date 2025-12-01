@@ -30,7 +30,11 @@ dependencies = [
     "uvicorn[standard]",
     "oracledb",
     "rich",
-    "typer-slim[standard]"
+    "typer-slim[standard]",
+    "fastmcp",
+    "google-generativeai",
+    "python-dotenv",
+    "pydantic"
 ]
 
 [project.urls]

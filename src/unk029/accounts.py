@@ -48,12 +48,16 @@ def get_account(account_no: int):
 
 def create_account(account: AccountCreate):
     with get_cursor() as cur:
-        acc_no_var = cur.var(int)
+        # Get next account number
+        cur.execute("SELECT MAX(account_no) FROM accounts")
+        max_id = cur.fetchone()[0] or 1000
+        account_no = max_id + 1
+        
+        # Insert new account
         cur.execute(
-            "INSERT INTO accounts (name, balance) VALUES (:name, :balance) RETURNING account_no INTO :acc_no",
-            {"name": account.name, "balance": account.balance, "acc_no": acc_no_var}
+            "INSERT INTO accounts (account_no, name, balance) VALUES (:id, :name, :balance)",
+            {"id": account_no, "name": account.name, "balance": account.balance}
         )
-        account_no = acc_no_var.getvalue()
         return {"account_no": account_no, "name": account.name, "balance": account.balance}
 
 
