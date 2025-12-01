@@ -59,7 +59,7 @@ def _get_session_key(request: Request) -> str:
 
 def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
     """
-    Call MCP Server tools via HTTP.
+    Call MCP Server tools via REST endpoints.
     Agent communicates with MCP Server to execute banking operations.
     
     Args:
@@ -70,53 +70,59 @@ def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
         Tool result as dict
     """
     try:
+        if not tool_input:
+            return {"error": "Invalid tool input"}
+            
         with httpx.Client(timeout=10.0) as client:
-            mcp_url = "http://unk029_mcp_server:8002/mcp"
+            mcp_url = "http://unk029_mcp_server:8002"
             
             print(f"DEBUG: Calling MCP tool {tool_name} with input: {tool_input}", flush=True)
             
-            # Map tool names to MCP tool names
-            mcp_tool_map = {
-                "get_account_info": "get_account_tool",
-                "deposit_funds": "topup_account_tool",
-                "withdraw_funds": "withdraw_account_tool"
-            }
-            
-            mcp_tool_name = mcp_tool_map.get(tool_name)
-            if not mcp_tool_name:
-                return {"error": f"Unknown tool: {tool_name}"}
-            
-            # Prepare JSON-RPC request for the MCP tool
-            request_payload = {
-                "jsonrpc": "2.0",
-                "id": "1",
-                "method": "tools/call",
-                "params": {
-                    "name": mcp_tool_name,
-                    "arguments": tool_input
-                }
-            }
-            
-            # Send request to MCP Server
-            response = client.post(mcp_url, json=request_payload, follow_redirects=True)
-            
-            print(f"DEBUG: MCP response status: {response.status_code}", flush=True)
-            print(f"DEBUG: MCP response: {response.text}", flush=True)
-            
-            if response.status_code == 200:
-                result = response.json()
-                
-                # Extract tool result from JSON-RPC response
-                if "result" in result:
-                    tool_result = result.get("result", {})
-                    return tool_result
-                elif "error" in result:
-                    error = result.get("error", {})
-                    return {"error": error.get("message", "RPC error")}
+            if tool_name == "get_account_info":
+                account_no = int(tool_input.get("account_no", 0))
+                response = client.get(f"{mcp_url}/account/{account_no}")
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "data": data
+                    }
                 else:
-                    return result
+                    return {"error": f"Account {account_no} not found"}
+                    
+            elif tool_name == "deposit_funds":
+                account_no = int(tool_input.get("account_no", 0))
+                amount = float(tool_input.get("amount", 0))
+                response = client.patch(
+                    f"{mcp_url}/account/{account_no}/topup",
+                    json={"amount": amount}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "data": data
+                    }
+                else:
+                    return {"error": "Deposit failed"}
+                    
+            elif tool_name == "withdraw_funds":
+                account_no = int(tool_input.get("account_no", 0))
+                amount = float(tool_input.get("amount", 0))
+                response = client.patch(
+                    f"{mcp_url}/account/{account_no}/withdraw",
+                    json={"amount": amount}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "data": data
+                    }
+                else:
+                    return {"error": "Withdrawal failed"}
             else:
-                return {"error": f"MCP Server error: {response.text}"}
+                return {"error": f"Unknown tool: {tool_name}"}
                 
     except Exception as e:
         print(f"Tool execution error: {e}", flush=True)
@@ -236,6 +242,10 @@ Respond in a friendly and helpful manner."""
                 tool_call = last_part.function_call
                 tool_name = tool_call.name
                 tool_args = {key: value for key, value in tool_call.args.items()}
+                
+                # Convert float account_no to int
+                if "account_no" in tool_args and isinstance(tool_args["account_no"], float):
+                    tool_args["account_no"] = int(tool_args["account_no"])
                 
                 print(f"DEBUG: Gemini called tool: {tool_name} with args: {tool_args}", flush=True)
                 

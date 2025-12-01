@@ -1,18 +1,26 @@
 """
 MCP Server - Banking Transaction Tools
 Uses FastAPI with FastMCP integration.
-MCP tools are exposed via HTTP endpoints.
+Exposes banking tools via REST endpoints for agent communication.
 """
 
 from fastapi import FastAPI
 from fastmcp import FastMCP
 import httpx
+from pydantic import BaseModel
 
 # Create FastAPI app
 app = FastAPI(title="UNK029 Bank MCP Server")
 
 # Initialize FastMCP
 mcp = FastMCP("UNK029 Bank MCP")
+
+# Request models
+class DepositRequest(BaseModel):
+    amount: float
+
+class WithdrawRequest(BaseModel):
+    amount: float
 
 # MCP Tool 1: Get Account Information
 @mcp.tool()
@@ -151,6 +159,25 @@ http_app = mcp.http_app()
 
 # Integrate with FastAPI
 app.mount("/mcp", http_app)
+
+# REST Endpoints - Simple delegation to MCP tools for agent communication
+@app.get("/account/{account_no}")
+async def get_account(account_no: int):
+    """Get account info via MCP tool."""
+    result = get_account_tool(account_no)
+    return result.get("data") if result.get("success") else {"error": result.get("error")}
+
+@app.patch("/account/{account_no}/topup")
+async def topup(account_no: int, request: DepositRequest):
+    """Deposit via MCP tool."""
+    result = topup_account_tool(account_no, request.amount)
+    return result.get("data") if result.get("success") else {"error": result.get("error")}
+
+@app.patch("/account/{account_no}/withdraw")
+async def withdraw(account_no: int, request: WithdrawRequest):
+    """Withdraw via MCP tool."""
+    result = withdraw_account_tool(account_no, request.amount)
+    return result.get("data") if result.get("success") else {"error": result.get("error")}
 
 # Health check endpoint
 @app.get("/health")
