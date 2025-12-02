@@ -4,35 +4,11 @@ Provides reusable banking operations for Oracle database.
 Can be configured with custom database credentials.
 """
 
-import oracledb
-import os
-from dotenv import load_dotenv
-from contextlib import contextmanager
+from typing import Dict, Any, Optional
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
 
-load_dotenv()
-
-
-# ============== Exceptions ==============
-
-class AccountError(Exception):
-    """Base exception for account operations."""
-    pass
-
-class AccountNotFoundError(AccountError):
-    """Raised when account is not found."""
-    def __init__(self, account_no: int):
-        self.account_no = account_no
-        super().__init__(f"Account {account_no} not found")
-
-class InsufficientFundsError(AccountError):
-    """Raised when withdrawal exceeds balance."""
-    def __init__(self, account_no: int, balance: float, amount: float):
-        self.account_no = account_no
-        self.balance = balance
-        self.amount = amount
-        super().__init__(f"Insufficient funds: balance £{balance}, requested £{amount}")
+from .database import DatabaseConfig, get_connection, get_cursor
+from .exceptions import AccountError, AccountNotFoundError, InsufficientFundsError
 
 
 # ============== Models ==============
@@ -43,62 +19,22 @@ class AccountCreate(BaseModel):
     balance: float = 0.0
     password: str
 
+
 class TopUp(BaseModel):
     """Model for deposit operation."""
     amount: float
 
+
 class WithDraw(BaseModel):
     """Model for withdrawal operation."""
     amount: float
+
 
 class Account(BaseModel):
     """Model representing a bank account."""
     account_no: int
     name: str
     balance: float
-
-
-# ============== Database Configuration ==============
-
-class DatabaseConfig:
-    """Database configuration holder."""
-    def __init__(
-        self,
-        user: Optional[str] = None,
-        password: Optional[str] = None,
-        dsn: Optional[str] = None
-    ):
-        self.user = user or os.getenv("ORACLE_USER")
-        self.password = password or os.getenv("ORACLE_PASSWORD")
-        self.dsn = dsn or os.getenv("ORACLE_DSN")
-    
-    def validate(self) -> bool:
-        """Check if all required config is present."""
-        return all([self.user, self.password, self.dsn])
-
-
-# Default configuration (uses environment variables)
-_default_config = DatabaseConfig()
-
-
-# ============== Database Connection ==============
-
-def get_connection(config: Optional[DatabaseConfig] = None):
-    """Get Oracle database connection."""
-    cfg = config or _default_config
-    return oracledb.connect(user=cfg.user, password=cfg.password, dsn=cfg.dsn)
-
-@contextmanager
-def get_cursor(config: Optional[DatabaseConfig] = None):
-    """Context manager for database cursor."""
-    conn = get_connection(config)
-    cur = conn.cursor()
-    try:
-        yield cur
-        conn.commit()
-    finally:
-        cur.close()
-        conn.close()
 
 
 # ============== Banking Operations ==============
