@@ -6,21 +6,55 @@ services:
     expose:
       - "8001"
     environment:
+      SERVICE: fastapi
+      PORT: 8001
       TNS_ADMIN: /opt/oracle/wallet
     volumes:
       - ./wallet:/opt/oracle/wallet:ro
     env_file:
       - .env
+    restart: unless-stopped
+
+  mcp_server:
+    build: .
+    container_name: unk029_mcp_server
+    environment:
+      SERVICE: mcp_server
+      PORT: 8002
+    env_file:
+      - .env
+    expose:
+      - "8002"
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  ai_agent:
+    build: .
+    container_name: unk029_ai_agent
+    environment:
+      SERVICE: ai_agent
+      PORT: 8003
+    env_file:
+      - .env
+    expose:
+      - "8003"
+    depends_on:
+      - mcp_server
+    restart: unless-stopped
+
   nginx:
-    image: nginx:alpine
+    build: ./frontend
     container_name: unk029_nginx
     ports:
-      - "8080:80"
+      - "80:80"
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./env/fullchain.pem:/etc/nginx/env/fullchain.pem:ro
       - ./env/privkey.pem:/etc/nginx/env/privkey.pem:ro
-     
     depends_on:
       - app
+      - mcp_server
+      - ai_agent
+    restart: unless-stopped

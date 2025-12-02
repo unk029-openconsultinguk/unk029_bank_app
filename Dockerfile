@@ -43,6 +43,11 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 # Copy in project dependency specification.
 COPY pyproject.toml uv.lock ./
 
+# Copy files needed for hatchling build
+COPY src/unk029/__about__.py src/unk029/__about__.py
+COPY src/unk029/__init__.py src/unk029/__init__.py
+COPY README.md ./
+
 # Install only project dependencies, as this is cached until pyproject.toml uv.lock are updated.
 RUN uv sync --locked --no-default-groups --no-install-project
 
@@ -87,6 +92,9 @@ WORKDIR ${APP_HOME}
 COPY --from=python_builder ${UV_PROJECT_ENVIRONMENT} ${UV_PROJECT_ENVIRONMENT}
 ENV PATH="${UV_PROJECT_ENVIRONMENT}/bin:${PATH}"
 
+# Copy source files
+COPY src src
+
 # For non-package applications, COPY source files here rather than in the --no-editable step
 # in the python_builder stage.
 
@@ -95,8 +103,16 @@ ENV PATH="${UV_PROJECT_ENVIRONMENT}/bin:${PATH}"
 RUN chown -R user:user ${HOME}
 
 # Run the FastAPI application using uvicorn
-CMD ["uvicorn", "unk029.main:app", "--host", "0.0.0.0", "--port", "8001"]
+# Override CMD below for multi-service support
+ENV SERVICE=fastapi
+CMD ["sh", "-c", "case \"$SERVICE\" in \
+  mcp_server) uvicorn src.unk029.mcpserver:app --host 0.0.0.0 --port 8002 ;; \
+  ai_agent) uvicorn src.unk029.agent:app --host 0.0.0.0 --port 8003 ;; \
+  fastapi) uvicorn src.unk029.fastapi:app --host 0.0.0.0 --port 8001 ;; \
+  *) echo \"Unknown service: $SERVICE\" && exit 1 ;; \
+esac"]
 
 USER user
+
 
 
