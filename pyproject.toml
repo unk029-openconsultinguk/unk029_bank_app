@@ -2,39 +2,42 @@
 name = "unk029"
 # version = "1.0.0"
 dynamic = ["version"]
-description = "Bank App - FastAPI application with best practices"
+description = "UNK029 Banking Library - Reusable banking operations with Oracle database support"
 authors = [
-    { name = "John Hagen", email = "johnthagen@users.noreply.github.com" }]
+    { name = "UNK029 Team", email = "unk029@openconsultinguk.com" }]
 license = "MIT"
 license-files = ["LICENSE*"]
 readme = "README.md"
+keywords = ["banking", "oracle", "database", "accounts", "financial"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
-    # Include this classifier to prevent accidentally publishing private code to PyPI.
-    #   https://pypi.org/classifiers/
-    "Private :: Do Not Upload",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Database",
 ]
-requires-python = "==3.12.*"
+requires-python = ">=3.10"
 dependencies = [
-    "fastapi",
-    "uvicorn[standard]",
-    "oracledb",
+    "oracledb>=2.0.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.20.0",
+    "fastmcp>=0.1.0",
+    "google-genai>=0.1.0",
+    "httpx>=0.25.0",
     "rich",
-    "typer-slim[standard]",
-    "fastmcp",
-    "google-generativeai",
-    "python-dotenv",
-    "pydantic"
+]
+
+[project.optional-dependencies]
+# Development/testing extras
+dev = [
+    "pytest",
+    "pytest-cov",
 ]
 
 [project.urls]

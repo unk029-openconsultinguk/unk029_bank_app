@@ -241,9 +241,31 @@ Respond in a friendly and helpful manner."""
             if hasattr(last_part, 'function_call'):
                 tool_call = last_part.function_call
                 tool_name = tool_call.name
-                tool_args = {key: value for key, value in tool_call.args.items()}
                 
-                # Convert float account_no to int
+                # Debug: print the args object
+                print(f"DEBUG: Raw args object: {tool_call.args}", flush=True)
+                print(f"DEBUG: Args type: {type(tool_call.args)}", flush=True)
+                
+                # Simple direct access to args fields
+                tool_args = {}
+                if hasattr(tool_call, 'args') and tool_call.args:
+                    # Try to convert to dict by accessing the internal structure
+                    try:
+                        # The args is a Struct protobuf - access via subscript
+                        for key in tool_call.args:
+                            tool_args[key] = tool_call.args[key]
+                    except Exception as e:
+                        print(f"DEBUG: Subscript access failed: {e}", flush=True)
+                        # Try attribute access
+                        try:
+                            if hasattr(tool_call.args, 'account_no'):
+                                tool_args['account_no'] = int(tool_call.args.account_no)
+                            if hasattr(tool_call.args, 'amount'):
+                                tool_args['amount'] = float(tool_call.args.amount)
+                        except Exception as e2:
+                            print(f"DEBUG: Attribute access failed: {e2}", flush=True)
+                
+                # Convert float to int for account_no
                 if "account_no" in tool_args and isinstance(tool_args["account_no"], float):
                     tool_args["account_no"] = int(tool_args["account_no"])
                 
@@ -254,19 +276,18 @@ Respond in a friendly and helpful manner."""
                 
                 print(f"DEBUG: Tool result: {tool_result}", flush=True)
                 
-                # Send tool result back to Gemini
-                response = chat.send_message(
-                    genai.protos.Content(
-                        parts=[
-                            genai.protos.Part(
-                                function_response=genai.protos.FunctionResponse(
-                                    name=tool_name,
-                                    response=tool_result
-                                )
-                            )
-                        ]
-                    )
-                )
+                # Send tool result back to Gemini as a text message
+                # Convert the result to a readable format
+                if tool_result.get("success"):
+                    result_text = f"Tool '{tool_name}' returned: {json.dumps(tool_result.get('data', {}))}"
+                else:
+                    result_text = f"Tool '{tool_name}' error: {tool_result.get('error', 'Unknown error')}"
+                
+                # Send result and let Gemini generate response
+                response = chat.send_message(result_text)
+                print(f"DEBUG: Response after tool result: {response.candidates[0].content.parts if response.candidates else 'No candidates'}", flush=True)
+                # Break after tool execution - let Gemini generate final response
+                break
             else:
                 # No more tool calls, break the loop
                 break

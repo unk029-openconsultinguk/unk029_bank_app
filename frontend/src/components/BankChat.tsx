@@ -9,14 +9,22 @@ interface Message {
   error?: boolean
 }
 
-interface BankChatProps {
-  onNavigate: (view: 'chat' | 'dashboard' | 'accounts') => void
-  onLogout: () => void
-}
-
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
-const BankChat = ({ onNavigate, onLogout }: BankChatProps) => {
+// Generate a NEW session ID each time (no persistence)
+const generateSessionId = () => {
+  return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+// Clear session on logout
+export const clearChatSession = () => {
+  sessionStorage.removeItem('chat_session_id')
+}
+
+const BankChat = () => {
+  // Generate new session ID when component mounts (fresh conversation each time)
+  const [sessionId] = useState(() => generateSessionId())
+  
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -86,7 +94,7 @@ const BankChat = ({ onNavigate, onLogout }: BankChatProps) => {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ message: textToSend }),
+        body: JSON.stringify({ message: textToSend, session_id: sessionId }),
         signal: controller.signal
       })
 
@@ -142,52 +150,14 @@ const BankChat = ({ onNavigate, onLogout }: BankChatProps) => {
 
   return (
     <div className="bank-chat">
-      {/* Modern Header with Navigation */}
-      <div className="chat-header">
-        <div className="chat-header-left">
-          <div className="chat-avatar-logo">
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-label="UNK029 Logo">
-              <rect width="40" height="40" rx="10" fill="url(#gradient)" />
-              <path d="M20 12L26 16V24L20 28L14 24V16L20 12Z" fill="white" opacity="0.9" />
-              <defs>
-                <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40">
-                  <stop offset="0%" stopColor="#3b82f6" />
-                  <stop offset="100%" stopColor="#14b8a6" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <div className="chat-header-info">
-            <h1>AI Banking Assistant</h1>
+      {/* Chat Title */}
+      <div className="chat-title-bar">
+        <div className="chat-title-content">
+          <span className="chat-title-icon">🤖</span>
+          <div>
+            <h2>AI Banking Assistant</h2>
             <p>Powered by Gemini AI</p>
           </div>
-        </div>
-        <div className="chat-header-nav">
-          {/* Navigation buttons without icons - UPDATED */}
-          <button 
-            className="nav-btn"
-            onClick={() => onNavigate('dashboard')}
-            title="View Dashboard"
-            aria-label="Navigate to Dashboard"
-          >
-            <span className="nav-btn-label">Dashboard</span>
-          </button>
-          <button 
-            className="nav-btn"
-            onClick={() => onNavigate('accounts')}
-            title="Manage Accounts"
-            aria-label="Navigate to Account Management"
-          >
-            <span className="nav-btn-label">Accounts</span>
-          </button>
-          <button 
-            className="nav-btn logout-nav-btn"
-            onClick={onLogout}
-            title="Logout"
-            aria-label="Logout from your account"
-          >
-            <span className="nav-btn-label">Logout</span>
-          </button>
         </div>
       </div>
 

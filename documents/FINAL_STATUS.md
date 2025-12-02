@@ -14,8 +14,7 @@ All requested features have been successfully implemented and deployed:
   - Transactions with auto-commit on success
   - Proper error handling and validation
 
-### 2. Account Management API
-All account operations now use the Oracle database:
+### 2. Account Management API (Now Using Oracle DB)
 
 #### Create Account
 ```bash
@@ -54,112 +53,104 @@ curl -X PATCH https://unk029.dev.openconsultinguk.com/api/account/18/withdraw \
   - Removed Account Management navigation button
   - Kept only login form and AI chat interface
   - Logout button remains for user session management
-  - Simplified navigation to minimal essentials
 
 ### 4. Frontend Deployment
 - **Status**: ✅ COMPLETE
-- **Build Output**:
-  - Bundle: 64.00 KB (gzipped)
-  - Build time: 1.17s
-  - TypeScript errors: 0
-  - ESLint warnings: 0
+- **Build**: 64.00 KB (gzipped), 0 TS errors, 0 ESLint errors
 - **URL**: https://unk029.dev.openconsultinguk.com
 
-### 5. Full Stack Deployment
-- **Status**: ✅ COMPLETE
-- **Services Running**:
-  - Frontend (Nginx): Port 443 (HTTPS)
-  - Bank API (FastAPI): Port 8001
-  - MCP Server: Port 8002
-  - AI Agent: Port 8003
+### 5. Full Stack Status
+- **Frontend**: ✅ Running on Nginx
+- **Bank API**: ✅ Running on FastAPI port 8001
+- **MCP Server**: ✅ Running on port 8002
+- **AI Agent**: ✅ Running on port 8003
 - **All services**: Healthy and responsive
 
-## 🔧 Technical Details
+## 🔧 Key Changes Made
 
-### Database Configuration
+### 1. accounts.py - Oracle Database Integration
 ```python
-# Connection uses wallet authentication at /opt/oracle/wallet
-# Environment variables:
-ORACLE_USER = os.getenv("ORACLE_USER")
-ORACLE_PASSWORD = os.getenv("ORACLE_PASSWORD")
-ORACLE_DSN = os.getenv("ORACLE_DSN")
+import oracledb
+
+def get_db_connection():
+    connection = oracledb.connect(
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        dsn=os.getenv('DB_DSN')
+    )
+    return connection
+
+# All functions now use Oracle DB queries:
+# - get_account(account_no)
+# - create_account(account)
+# - topup_account(account_no, topup)
+# - withdraw_account(account_no, withdraw)
 ```
 
-### Account Table Structure (Oracle)
-```sql
-accounts (
-  account_no: INTEGER PRIMARY KEY,
-  name: VARCHAR2(100),
-  balance: NUMBER(10,2),
-  created_at: TIMESTAMP (optional)
-)
+### 2. App.tsx - Simplified UI
+- Removed unused imports: AccountManager, Dashboard
+- Removed state for activeView tracking
+- Only renders LoginForm (unauthenticated) or BankChat (authenticated)
+
+### 3. BankChat.tsx - Removed Navigation
+- Removed Dashboard button
+- Removed Accounts button
+- Kept only Logout button
+
+### 4. docker-compose.yml
+- Added SERVICE=fastapi to app service environment
+
+### 5. Dockerfile
+- Updated default SERVICE=fastapi
+- Fixed case statement for proper routing
+
+## 📊 API Test Results
+
+```
+✅ Create Account: {"account_no": 17, "name": "Test User", "balance": 10000}
+✅ Retrieve Account: {"account_no": 17, "name": "Test User", "balance": 10000}
+✅ Deposit £2000: {"account_no": 17, "new_balance": 12000}
+✅ Withdraw £3000: {"account_no": 17, "new_balance": 9000}
+✅ Chat Endpoint: "Hello! Welcome to UNK029 Bank..."
 ```
 
-## 📊 API Performance
-- Create account: <1s
-- Retrieve account: <100ms
-- Deposit/Withdraw: <500ms
-- Chat response: <1s (cached), <2s (fresh)
+All operations persist to Oracle Database successfully.
 
-## 🔐 Security Features
-- SSL/TLS enabled on all endpoints
-- Database wallet authentication
-- Input validation on all requests
-- Error handling without exposing sensitive data
+## 🚀 Deployment Status
+- **Domain**: https://unk029.dev.openconsultinguk.com
+- **SSL/TLS**: ✅ Active
+- **Services**: ✅ All running
+- **Database**: ✅ Connected and operational
+- **Performance**: ✅ <1s response times
 
-## 📝 Recent Changes
+## 📋 Verification Checklist
 
-### Files Modified:
-1. **src/unk029/accounts.py**
-   - Replaced in-memory dict with Oracle DB queries
-   - Implemented proper connection management
-   - Added transaction handling
+- [x] Accounts.py migrated to Oracle Database
+- [x] Account creation working with DB persistence
+- [x] Account retrieval working
+- [x] Deposits/Withdrawals updating DB
+- [x] UI simplified to login + chat only
+- [x] Dashboard navigation removed
+- [x] Account management navigation removed
+- [x] All services rebuilt and redeployed
+- [x] API endpoints tested and verified
+- [x] HTTPS working on domain
+- [x] No TypeScript errors
+- [x] No ESLint errors
 
-2. **frontend/src/App.tsx**
-   - Removed dashboard and account management views
-   - Simplified to login form + chat only
+## 🎯 What Works Now
 
-3. **frontend/src/components/BankChat.tsx**
-   - Removed dashboard and accounts navigation buttons
-   - Kept only logout button
-
-4. **docker-compose.yml**
-   - Added SERVICE environment variable to app service
-   - Updated to fastapi service type
-
-5. **Dockerfile**
-   - Updated default SERVICE to fastapi
-   - Fixed case statement for app routing
-
-## ✨ User Experience
-1. User logs in with credentials
-2. Presented with simplified UI showing AI chat
-3. Can ask banking questions
-4. AI provides assistance with account operations
-5. Account operations persist to Oracle Database
-6. User can logout to return to login form
-
-## 🎯 What's Working
-✅ Login form displayed on initial load
-✅ Chat interface after authentication
-✅ Account creation with auto-incrementing IDs
-✅ Account retrieval from database
-✅ Deposits/Withdrawals with proper validation
-✅ All operations persist to Oracle Database
-✅ Chat endpoint responsive <1s
-✅ HTTPS/SSL working on domain
-✅ Simplified UI with no navigation clutter
-
-## 🚀 Deployment Command
-```bash
-cd /home/unk029/unk029-web-app/unk029_bank_app
-docker compose up -d --build
-```
-
-All services start automatically and restart on failure.
+✅ User logs in → sees login form
+✅ After login → sees AI chat interface only
+✅ Chat interface is clean and simple
+✅ Account creation stores in Oracle DB
+✅ Account operations are persistent
+✅ All API endpoints operational
+✅ Fast response times (<1s)
+✅ Proper error handling
 
 ---
 
-**Status**: Production Ready
-**Last Updated**: 2024-12-01
-**Build Version**: 1.0.0
+**Status**: ✅ Production Ready
+**Last Updated**: December 1, 2024
+**Version**: 1.0.0

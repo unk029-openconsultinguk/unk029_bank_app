@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import './App.css'
 import BankChat from './components/BankChat'
 import AccountManager from './components/AccountManager'
 import Dashboard from './components/Dashboard'
 import LoginForm from './components/LoginForm'
+import Header from './components/Header'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 function App() {
@@ -11,7 +13,8 @@ function App() {
     const token = localStorage.getItem('auth_token')
     return !!token
   })
-  const [activeView, setActiveView] = useState<'chat' | 'dashboard' | 'accounts'>('chat')
+  const navigate = useNavigate()
+  const location = useLocation()
 
   const handleLogin = () => {
     setIsAuthenticated(true)
@@ -21,8 +24,14 @@ function App() {
     localStorage.removeItem('auth_token')
     localStorage.removeItem('username')
     setIsAuthenticated(false)
-    setActiveView('chat')
   }
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated && location.pathname !== '/') {
+      navigate('/')
+    }
+  }, [isAuthenticated, location.pathname, navigate])
 
   if (!isAuthenticated) {
     return <LoginForm onLogin={handleLogin} />
@@ -31,35 +40,19 @@ function App() {
   return (
     <ErrorBoundary>
       <div className="app">
-        {activeView === 'chat' && <BankChat onNavigate={setActiveView} onLogout={handleLogout} />}
-        {activeView === 'dashboard' && (
-          <div className="full-page-view">
-            <header className="view-header">
-              <button className="back-btn" onClick={() => setActiveView('chat')}>
-                ← Back to AI Chat
-              </button>
-              <h2>Dashboard</h2>
-              <button className="logout-btn" onClick={handleLogout}>
-                🚪 Logout
-              </button>
-            </header>
-            <Dashboard />
-          </div>
-        )}
-        {activeView === 'accounts' && (
-          <div className="full-page-view">
-            <header className="view-header">
-              <button className="back-btn" onClick={() => setActiveView('chat')}>
-                ← Back to AI Chat
-              </button>
-              <h2>Manage Accounts</h2>
-              <button className="logout-btn" onClick={handleLogout}>
-                🚪 Logout
-              </button>
-            </header>
-            <AccountManager />
-          </div>
-        )}
+        <div className="full-page-view">
+          <Header onLogout={handleLogout} />
+          <main className="main-content">
+            <Routes>
+              <Route path="/" element={<Navigate to="/ai-assistant" replace />} />
+              <Route path="/ai-assistant" element={<BankChat />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/accounts" element={<AccountManager initialTab="manage" />} />
+              <Route path="/accounts/create" element={<AccountManager initialTab="create" />} />
+              <Route path="*" element={<Navigate to="/ai-assistant" replace />} />
+            </Routes>
+          </main>
+        </div>
       </div>
     </ErrorBoundary>
   )

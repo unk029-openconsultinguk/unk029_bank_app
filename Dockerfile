@@ -43,6 +43,11 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 # Copy in project dependency specification.
 COPY pyproject.toml uv.lock ./
 
+# Copy files needed for hatchling build
+COPY src/unk029/__about__.py src/unk029/__about__.py
+COPY src/unk029/__init__.py src/unk029/__init__.py
+COPY README.md ./
+
 # Install only project dependencies, as this is cached until pyproject.toml uv.lock are updated.
 RUN uv sync --locked --no-default-groups --no-install-project
 
