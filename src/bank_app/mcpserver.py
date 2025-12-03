@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import logging
 import os
 import traceback
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastmcp import FastMCP
@@ -44,7 +45,7 @@ client = genai.Client(api_key=GOOGLE_API_KEY)
 BANK_API_URL = os.getenv("BANK_API_URL", "http://unk029_bank_app:8001")
 
 # Session management
-conversation_sessions: dict[str, list] = defaultdict(list)
+conversation_sessions: dict[str, list[dict[str, str]]] = defaultdict(list)
 SESSION_TIMEOUT = timedelta(minutes=30)
 last_activity: dict[str, datetime] = {}
 
@@ -107,13 +108,24 @@ TOOL_DEFINITIONS = {
 }
 
 
-def _build_function_declaration(name: str, defn: dict) -> types.FunctionDeclaration:
+def _build_function_declaration(name: str, defn: dict[str, Any]) -> types.FunctionDeclaration:
     """Build a FunctionDeclaration from tool definition."""
     properties = {k: {"type": v[0], "description": v[1]} for k, v in defn["parameters"].items()}
     return types.FunctionDeclaration(
         name=name,
         description=defn["description"],
-        parameters={"type": "object", "properties": properties, "required": defn["required"]},
+        parameters=types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                k: types.Schema(type=types.Type.STRING, description=v["description"])
+                if v["type"] == "string"
+                else types.Schema(type=types.Type.INTEGER, description=v["description"])
+                if v["type"] == "integer"
+                else types.Schema(type=types.Type.NUMBER, description=v["description"])
+                for k, v in properties.items()
+            },
+            required=defn["required"],
+        ),
     )
 
 
@@ -144,7 +156,7 @@ def get_session_id(request: Request) -> str:
     return "default"
 
 
-def cleanup_old_sessions():
+def cleanup_old_sessions() -> None:
     """Remove expired sessions."""
     now = datetime.now()
     expired = [sid for sid, last in last_activity.items() if now - last > SESSION_TIMEOUT]
@@ -154,7 +166,9 @@ def cleanup_old_sessions():
 
 
 # Reusable HTTP client for Bank API calls
-def call_bank_api(method: str, endpoint: str, json_data: dict | None = None) -> dict:
+def call_bank_api(
+    method: str, endpoint: str, json_data: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Make a call to the Bank API."""
     url = f"{BANK_API_URL}{endpoint}"
     try:
@@ -293,7 +307,7 @@ QUERY_ALIASES = {
 
 
 # Core banking functions (business logic)
-def _get_account(account_no: int) -> dict:
+def _get_account(account_no: int) -> dict[str, Any]:
     """Get account information."""
     result = call_bank_api("GET", f"/account/{account_no}")
     if result["success"]:
@@ -310,7 +324,7 @@ def _get_account(account_no: int) -> dict:
     return {"success": False, "error": result.get("error", f"Account #{account_no} not found")}
 
 
-def _topup_account(account_no: int, amount: float) -> dict:
+def _topup_account(account_no: int, amount: float) -> dict[str, Any]:
     """Deposit funds into an account."""
     result = call_bank_api("PATCH", f"/account/{account_no}/topup", {"amount": float(amount)})
     if result["success"]:
@@ -328,7 +342,7 @@ def _topup_account(account_no: int, amount: float) -> dict:
     return {"success": False, "error": result.get("error", "Failed to process deposit")}
 
 
-def _withdraw_account(account_no: int, amount: float) -> dict:
+def _withdraw_account(account_no: int, amount: float) -> dict[str, Any]:
     """Withdraw funds from an account."""
     result = call_bank_api("PATCH", f"/account/{account_no}/withdraw", {"amount": float(amount)})
     if result["success"]:
@@ -346,7 +360,7 @@ def _withdraw_account(account_no: int, amount: float) -> dict:
     return {"success": False, "error": result.get("error", "Failed to process withdrawal")}
 
 
-def _get_banking_info(query_type: str) -> dict:
+def _get_banking_info(query_type: str) -> dict[str, Any]:
     """Get general banking information."""
     key = query_type.lower().replace(" ", "_").replace("-", "_")
     key = QUERY_ALIASES.get(key, key)
@@ -357,39 +371,50 @@ def _get_banking_info(query_type: str) -> dict:
 
 # MCP Tool wrappers (thin layer for MCP protocol)
 @mcp.tool()
-def get_account_tool(account_no: int) -> dict:
+def get_account_tool(account_no: int) -> dict[str, Any]:
     """Get account info (balance, name)."""
     return _get_account(account_no)
 
 
 @mcp.tool()
-def topup_account_tool(account_no: int, amount: float) -> dict:
+def topup_account_tool(account_no: int, amount: float) -> dict[str, Any]:
     """Deposit funds into an account."""
     return _topup_account(account_no, amount)
 
 
 @mcp.tool()
-def withdraw_account_tool(account_no: int, amount: float) -> dict:
+def withdraw_account_tool(account_no: int, amount: float) -> dict[str, Any]:
     """Withdraw funds from an account."""
     return _withdraw_account(account_no, amount)
 
 
 @mcp.tool()
-def get_banking_info_tool(query_type: str) -> dict:
+def get_banking_info_tool(query_type: str) -> dict[str, Any]:
     """Get banking information (rates, fees, limits, services, etc)."""
     return _get_banking_info(query_type)
 
 
-def execute_tool(tool_name: str, args: dict) -> dict:
+def execute_tool(tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
     """Execute a tool by name with given arguments."""
     logger.info(f"Executing tool: {tool_name} with args: {args}")
 
     if tool_name == "get_account_tool":
-        result = _get_account(int(args.get("account_no")))
+        account_no = args.get("account_no")
+        if account_no is None:
+            return {"success": False, "error": "account_no is required"}
+        result = _get_account(int(account_no))
     elif tool_name == "topup_account_tool":
-        result = _topup_account(int(args.get("account_no")), float(args.get("amount")))
+        account_no = args.get("account_no")
+        amount = args.get("amount")
+        if account_no is None or amount is None:
+            return {"success": False, "error": "account_no and amount are required"}
+        result = _topup_account(int(account_no), float(amount))
     elif tool_name == "withdraw_account_tool":
-        result = _withdraw_account(int(args.get("account_no")), float(args.get("amount")))
+        account_no = args.get("account_no")
+        amount = args.get("amount")
+        if account_no is None or amount is None:
+            return {"success": False, "error": "account_no and amount are required"}
+        result = _withdraw_account(int(account_no), float(amount))
     elif tool_name == "get_banking_info_tool":
         result = _get_banking_info(str(args.get("query_type", "services")))
     else:
@@ -409,7 +434,7 @@ app.mount("/mcp", http_app)
 
 # Chat endpoint with Google ADK integration
 @app.post("/chat")
-async def chat(request: ChatRequest, req: Request):
+async def chat(request: ChatRequest, req: Request) -> dict[str, str]:
     """
     Chat endpoint with Google ADK for natural language banking.
     Google ADK calls MCP tools for account operations and banking info.
@@ -446,23 +471,29 @@ async def chat(request: ChatRequest, req: Request):
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=full_message,
-            config=types.GenerateContentConfig(tools=BANKING_TOOLS, temperature=0.3),
+            config=types.GenerateContentConfig(tools=list(BANKING_TOOLS), temperature=0.3),
         )
 
         # Process response with tool calling loop
         for _ in range(5):  # Max iterations
+            # Check if response has valid candidates
+            if not response.candidates:
+                break
+            content = response.candidates[0].content
+            if not content or not content.parts:
+                break
+
             # Extract function calls
             function_calls = []
-            if response.candidates and response.candidates[0].content.parts:
-                for part in response.candidates[0].content.parts:
-                    has_fc = hasattr(part, "function_call") and part.function_call
-                    has_name = has_fc and hasattr(part.function_call, "name")
-                    if has_name:
-                        function_calls.append(part.function_call)
+            for part in content.parts:
+                has_fc = hasattr(part, "function_call") and part.function_call
+                has_name = has_fc and hasattr(part.function_call, "name")
+                if has_name and part.function_call:
+                    function_calls.append(part.function_call)
 
             if not function_calls:
                 # No tool calls - extract text response
-                for part in response.candidates[0].content.parts if response.candidates else []:
+                for part in content.parts:
                     if hasattr(part, "text") and part.text:
                         history.append({"role": "assistant", "content": part.text})
                         return {"reply": part.text}
@@ -470,21 +501,24 @@ async def chat(request: ChatRequest, req: Request):
 
             # Execute tool calls
             function_responses = []
-            tool_summary = []
+            tool_summary: list[str] = []
             for fc in function_calls:
-                args = dict(fc.args) if fc.args else {}
-                logger.info(f"Tool call: {fc.name}({args})")
+                fc_name = fc.name if fc.name else ""
+                if not fc_name:
+                    continue
+                args: dict[str, Any] = dict(fc.args) if fc.args else {}
+                logger.info(f"Tool call: {fc_name}({args})")
 
-                result = execute_tool(fc.name, args)
+                result = execute_tool(fc_name, args)
                 logger.info(f"Tool result: {result}")
 
                 # Track tool calls for history
-                tool_summary.append(f"[Tool: {fc.name}({args}) → {result}]")
+                tool_summary.append(f"[Tool: {fc_name}({args}) → {result}]")
 
                 function_responses.append(
                     types.Part(
                         function_response=types.FunctionResponse(
-                            name=fc.name, response={"result": result}
+                            name=fc_name, response={"result": result}
                         )
                     )
                 )
@@ -494,6 +528,8 @@ async def chat(request: ChatRequest, req: Request):
                 history.append({"role": "assistant", "content": " ".join(tool_summary)})
 
             # Continue conversation with tool results
+            if not response.candidates:
+                break
             response = client.models.generate_content(
                 model="gemini-2.0-flash",
                 contents=[
@@ -501,7 +537,7 @@ async def chat(request: ChatRequest, req: Request):
                     response.candidates[0].content,
                     types.Content(role="function", parts=function_responses),
                 ],
-                config=types.GenerateContentConfig(tools=BANKING_TOOLS, temperature=0.3),
+                config=types.GenerateContentConfig(tools=list(BANKING_TOOLS), temperature=0.3),
             )
 
         # Fallback
@@ -516,7 +552,7 @@ async def chat(request: ChatRequest, req: Request):
 
 # Health check endpoint
 @app.get("/health")
-async def health():
+async def health() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok", "service": "MCP Server"}
 
