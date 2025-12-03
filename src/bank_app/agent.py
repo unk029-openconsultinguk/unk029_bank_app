@@ -6,6 +6,7 @@ Architecture: Agent -> MCP Server -> Bank API -> Oracle DB
 
 from datetime import datetime, timedelta
 import os
+from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -68,7 +69,7 @@ def _get_session_key(request: Request | None) -> str:
     return request.client.host if request and request.client else "default"
 
 
-def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
+def call_mcp_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
     """
     Call MCP Server tools via REST endpoints.
     Agent communicates with MCP Server to execute banking operations.
@@ -210,7 +211,7 @@ async def process_chat(message: str, request: Request | None = None) -> str:
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=[types.Content(role="user", parts=[types.Part(text=full_message)])],
-            config=types.GenerateContentConfig(tools=AGENT_TOOLS, temperature=0.3),
+            config=types.GenerateContentConfig(tools=list(AGENT_TOOLS), temperature=0.3),
         )
 
         print(f"DEBUG: Gemini response candidates: {response.candidates}", flush=True)
@@ -241,8 +242,10 @@ async def process_chat(message: str, request: Request | None = None) -> str:
                 break
 
             # Execute the tool
-            tool_name = function_call.name
-            tool_args = dict(function_call.args) if function_call.args else {}
+            tool_name = function_call.name or ""
+            if not tool_name:
+                break
+            tool_args: dict[str, Any] = dict(function_call.args) if function_call.args else {}
 
             # Convert float to int for account_no
             if "account_no" in tool_args and isinstance(tool_args["account_no"], float):
@@ -270,15 +273,17 @@ async def process_chat(message: str, request: Request | None = None) -> str:
                     content,
                     types.Content(role="function", parts=[function_response]),
                 ],
-                config=types.GenerateContentConfig(tools=AGENT_TOOLS, temperature=0.3),
+                config=types.GenerateContentConfig(tools=list(AGENT_TOOLS), temperature=0.3),
             )
 
         # Extract final text response
         final_response = ""
         if response.candidates and response.candidates[0].content:
-            for part in response.candidates[0].content.parts:
-                if part.text:
-                    final_response += part.text
+            parts = response.candidates[0].content.parts
+            if parts:
+                for part in parts:
+                    if part.text:
+                        final_response += part.text
 
         # Fallback response if no text generated
         if not final_response:
