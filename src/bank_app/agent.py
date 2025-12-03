@@ -1,22 +1,27 @@
 """
-Root Banking Agent - Uses Gemini AI with MCP Server Tools
+Root Banking Agent - Uses Google ADK (google-genai) with MCP Server Tools
 Agent calls MCP Server tools to process banking queries.
 Architecture: Agent -> MCP Server -> Bank API -> Oracle DB
 """
 
 from datetime import datetime, timedelta
-import json
 import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import httpx
 from pydantic import BaseModel
 
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=GEMINI_API_KEY)
+
+# Configure Google ADK client
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY environment variable not set")
+
+client = genai.Client(api_key=GOOGLE_API_KEY)
 
 app = FastAPI(title="UNK029 Root Banking Agent")
 
@@ -31,8 +36,8 @@ class ChatResponse(BaseModel):
 
 
 # Session state and cache
-session_state = {}
-response_cache = {}
+session_state: dict[str, list[dict[str, str]]] = {}
+response_cache: dict[str, tuple[str, datetime]] = {}
 CACHE_TTL = 300  # 5 minutes
 
 
@@ -58,7 +63,7 @@ def cache_response(message: str, response: str) -> None:
         del response_cache[oldest_key]
 
 
-def _get_session_key(request: Request) -> str:
+def _get_session_key(request: Request | None) -> str:
     """Get session key from client IP."""
     return request.client.host if request and request.client else "default"
 
@@ -67,26 +72,19 @@ def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
     """
     Call MCP Server tools via REST endpoints.
     Agent communicates with MCP Server to execute banking operations.
-
-    Args:
-        tool_name: Name of the tool (get_account_info, deposit_funds, withdraw_funds)
-        tool_input: Tool parameters
-
-    Returns:
-        Tool result as dict
     """
     try:
         if not tool_input:
             return {"error": "Invalid tool input"}
 
-        with httpx.Client(timeout=10.0) as client:
+        with httpx.Client(timeout=10.0) as http_client:
             mcp_url = "http://unk029_mcp_server:8002"
 
             print(f"DEBUG: Calling MCP tool {tool_name} with input: {tool_input}", flush=True)
 
             if tool_name == "get_account_info":
                 account_no = int(tool_input.get("account_no", 0))
-                response = client.get(f"{mcp_url}/account/{account_no}")
+                response = http_client.get(f"{mcp_url}/account/{account_no}")
                 if response.status_code == 200:
                     data = response.json()
                     return {"success": True, "data": data}
@@ -96,7 +94,7 @@ def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
             elif tool_name == "deposit_funds":
                 account_no = int(tool_input.get("account_no", 0))
                 amount = float(tool_input.get("amount", 0))
-                response = client.patch(
+                response = http_client.patch(
                     f"{mcp_url}/account/{account_no}/topup", json={"amount": amount}
                 )
                 if response.status_code == 200:
@@ -108,7 +106,7 @@ def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
             elif tool_name == "withdraw_funds":
                 account_no = int(tool_input.get("account_no", 0))
                 amount = float(tool_input.get("amount", 0))
-                response = client.patch(
+                response = http_client.patch(
                     f"{mcp_url}/account/{account_no}/withdraw", json={"amount": amount}
                 )
                 if response.status_code == 200:
@@ -124,26 +122,65 @@ def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
         return {"error": f"Failed to call tool: {e!s}"}
 
 
-async def process_chat(message: str, request: Request = None) -> str:
-    """
-    Process user message with Gemini AI using MCP Server tools.
+# Define tools for Google ADK
+AGENT_TOOLS = [
+    types.Tool(
+        function_declarations=[
+            types.FunctionDeclaration(
+                name="get_account_info",
+                description="Get account info: balance, name, account number",
+                parameters=types.Schema(
+                    type=types.Type.OBJECT,
+                    properties={
+                        "account_no": types.Schema(
+                            type=types.Type.INTEGER,
+                            description="The account number to query",
+                        ),
+                    },
+                    required=["account_no"],
+                ),
+            ),
+            types.FunctionDeclaration(
+                name="deposit_funds",
+                description="Deposit funds into a bank account",
+                parameters=types.Schema(
+                    type=types.Type.OBJECT,
+                    properties={
+                        "account_no": types.Schema(
+                            type=types.Type.INTEGER,
+                            description="The account number to deposit to",
+                        ),
+                        "amount": types.Schema(
+                            type=types.Type.NUMBER,
+                            description="The amount to deposit in GBP",
+                        ),
+                    },
+                    required=["account_no", "amount"],
+                ),
+            ),
+            types.FunctionDeclaration(
+                name="withdraw_funds",
+                description="Withdraw funds from a bank account",
+                parameters=types.Schema(
+                    type=types.Type.OBJECT,
+                    properties={
+                        "account_no": types.Schema(
+                            type=types.Type.INTEGER,
+                            description="The account number to withdraw from",
+                        ),
+                        "amount": types.Schema(
+                            type=types.Type.NUMBER,
+                            description="The amount to withdraw in GBP",
+                        ),
+                    },
+                    required=["account_no", "amount"],
+                ),
+            ),
+        ]
+    )
+]
 
-    Args:
-        message: User message
-        request: FastAPI request object
-
-    Returns:
-        AI response
-    """
-    # Check cache first
-    cached = get_cached_response(message)
-    if cached:
-        return cached
-
-    print(f"DEBUG: Processing message: {message}", flush=True)
-
-    # Define system prompt for the agent
-    system_prompt = """You are a friendly banking assistant. \
+SYSTEM_PROMPT = """You are a friendly banking assistant. \
 You have access to the following tools:
 - get_account_info: Get account balance and information
 - deposit_funds: Deposit money into an account
@@ -153,144 +190,94 @@ When the user asks about their account, use the appropriate tool to get the info
 Always extract account number and amount from user messages.
 Respond in a friendly and helpful manner."""
 
+
+async def process_chat(message: str, request: Request | None = None) -> str:
+    """
+    Process user message with Google ADK (Gemini) using MCP Server tools.
+    """
+    # Check cache first
+    cached = get_cached_response(message)
+    if cached:
+        return cached
+
+    print(f"DEBUG: Processing message: {message}", flush=True)
+
     try:
-        # Create Gemini model with tools
-        model = genai.GenerativeModel(
-            "gemini-2.5-flash",
-            tools=[
-                genai.protos.Tool(
-                    function_declarations=[
-                        genai.protos.FunctionDeclaration(
-                            name="get_account_info",
-                            description="Get account info: balance, name, account number",
-                            parameters=genai.protos.Schema(
-                                type_="OBJECT",
-                                properties={
-                                    "account_no": genai.protos.Schema(
-                                        type_="INTEGER", description="The account number to query"
-                                    )
-                                },
-                                required=["account_no"],
-                            ),
-                        ),
-                        genai.protos.FunctionDeclaration(
-                            name="deposit_funds",
-                            description="Deposit funds into a bank account",
-                            parameters=genai.protos.Schema(
-                                type_="OBJECT",
-                                properties={
-                                    "account_no": genai.protos.Schema(
-                                        type_="INTEGER",
-                                        description="The account number to deposit to",
-                                    ),
-                                    "amount": genai.protos.Schema(
-                                        type_="NUMBER", description="The amount to deposit in GBP"
-                                    ),
-                                },
-                                required=["account_no", "amount"],
-                            ),
-                        ),
-                        genai.protos.FunctionDeclaration(
-                            name="withdraw_funds",
-                            description="Withdraw funds from a bank account",
-                            parameters=genai.protos.Schema(
-                                type_="OBJECT",
-                                properties={
-                                    "account_no": genai.protos.Schema(
-                                        type_="INTEGER",
-                                        description="The account number to withdraw from",
-                                    ),
-                                    "amount": genai.protos.Schema(
-                                        type_="NUMBER", description="The amount to withdraw in GBP"
-                                    ),
-                                },
-                                required=["account_no", "amount"],
-                            ),
-                        ),
-                    ]
-                )
-            ],
-            system_instruction=system_prompt,
+        # Build full prompt with system instruction
+        full_message = f"{SYSTEM_PROMPT}\n\nUser: {message}"
+
+        # Call Gemini with tools
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[types.Content(role="user", parts=[types.Part(text=full_message)])],
+            config=types.GenerateContentConfig(tools=AGENT_TOOLS, temperature=0.3),
         )
 
-        # Initial chat with Gemini
-        print(f"DEBUG: Calling Gemini with message: {message}", flush=True)
-        chat = model.start_chat()
-        response = chat.send_message(message)
-
-        print(f"DEBUG: Gemini response: {response}", flush=True)
+        print(f"DEBUG: Gemini response candidates: {response.candidates}", flush=True)
 
         # Process tool calls if Gemini decides to use tools
         max_iterations = 5
         iteration = 0
 
-        while response.candidates[0].content.parts and iteration < max_iterations:
+        while iteration < max_iterations:
             iteration += 1
-            last_part = response.candidates[0].content.parts[-1]
 
-            # Check if Gemini wants to call a tool
-            if hasattr(last_part, "function_call"):
-                tool_call = last_part.function_call
-                tool_name = tool_call.name
-
-                # Debug: print the args object
-                print(f"DEBUG: Raw args object: {tool_call.args}", flush=True)
-                print(f"DEBUG: Args type: {type(tool_call.args)}", flush=True)
-
-                # Simple direct access to args fields
-                tool_args = {}
-                if hasattr(tool_call, "args") and tool_call.args:
-                    # Try to convert to dict by accessing the internal structure
-                    try:
-                        # The args is a Struct protobuf - access via subscript
-                        for key in tool_call.args:
-                            tool_args[key] = tool_call.args[key]
-                    except Exception as e:
-                        print(f"DEBUG: Subscript access failed: {e}", flush=True)
-                        # Try attribute access
-                        try:
-                            if hasattr(tool_call.args, "account_no"):
-                                tool_args["account_no"] = int(tool_call.args.account_no)
-                            if hasattr(tool_call.args, "amount"):
-                                tool_args["amount"] = float(tool_call.args.amount)
-                        except Exception as e2:
-                            print(f"DEBUG: Attribute access failed: {e2}", flush=True)
-
-                # Convert float to int for account_no
-                if "account_no" in tool_args and isinstance(tool_args["account_no"], float):
-                    tool_args["account_no"] = int(tool_args["account_no"])
-
-                print(f"DEBUG: Gemini called tool: {tool_name} with args: {tool_args}", flush=True)
-
-                # Call the MCP tool
-                tool_result = call_mcp_tool(tool_name, tool_args)
-
-                print(f"DEBUG: Tool result: {tool_result}", flush=True)
-
-                # Send tool result back to Gemini as a text message
-                # Convert the result to a readable format
-                if tool_result.get("success"):
-                    data = json.dumps(tool_result.get("data", {}))
-                    result_text = f"Tool '{tool_name}' returned: {data}"
-                else:
-                    err = tool_result.get("error", "Unknown error")
-                    result_text = f"Tool '{tool_name}' error: {err}"
-
-                # Send result and let Gemini generate response
-                response = chat.send_message(result_text)
-                parts = response.candidates[0].content.parts if response.candidates else None
-                print(f"DEBUG: Response after tool result: {parts}", flush=True)
-                # Break after tool execution - let Gemini generate final response
-                break
-            else:
-                # No more tool calls, break the loop
+            if not response.candidates or not response.candidates[0].content:
                 break
 
-        # Extract final text response from Gemini
+            content = response.candidates[0].content
+            if not content.parts:
+                break
+
+            # Check for function calls
+            function_call = None
+            for part in content.parts:
+                if part.function_call:
+                    function_call = part.function_call
+                    break
+
+            if not function_call:
+                # No function call, we have the final response
+                break
+
+            # Execute the tool
+            tool_name = function_call.name
+            tool_args = dict(function_call.args) if function_call.args else {}
+
+            # Convert float to int for account_no
+            if "account_no" in tool_args and isinstance(tool_args["account_no"], float):
+                tool_args["account_no"] = int(tool_args["account_no"])
+
+            print(f"DEBUG: Gemini called tool: {tool_name} with args: {tool_args}", flush=True)
+
+            # Call the MCP tool
+            tool_result = call_mcp_tool(tool_name, tool_args)
+            print(f"DEBUG: Tool result: {tool_result}", flush=True)
+
+            # Send tool result back to Gemini
+            function_response = types.Part(
+                function_response=types.FunctionResponse(
+                    name=tool_name,
+                    response=tool_result,
+                )
+            )
+
+            # Continue conversation with tool result
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=[
+                    types.Content(role="user", parts=[types.Part(text=full_message)]),
+                    content,
+                    types.Content(role="function", parts=[function_response]),
+                ],
+                config=types.GenerateContentConfig(tools=AGENT_TOOLS, temperature=0.3),
+            )
+
+        # Extract final text response
         final_response = ""
-        if response.candidates:
+        if response.candidates and response.candidates[0].content:
             for part in response.candidates[0].content.parts:
-                if hasattr(part, "text") and part.text:
+                if part.text:
                     final_response += part.text
 
         # Fallback response if no text generated
@@ -315,7 +302,7 @@ Respond in a friendly and helpful manner."""
 
 # Chat Endpoint
 @app.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(chat: ChatRequest, request: Request):
+async def chat_endpoint(chat: ChatRequest, request: Request) -> ChatResponse:
     """Main chat endpoint - process user message via Gemini AI with MCP tools."""
     print("=== AI AGENT CHAT ENDPOINT ===", flush=True)
     print(f"Message: {chat.message}", flush=True)
@@ -326,7 +313,7 @@ async def chat_endpoint(chat: ChatRequest, request: Request):
 
 # Health check
 @app.get("/health")
-async def health():
+async def health() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok", "service": "AI Agent"}
 

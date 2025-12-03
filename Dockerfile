@@ -95,8 +95,8 @@ ENV PATH="${UV_PROJECT_ENVIRONMENT}/bin:${PATH}"
 # Copy source files
 COPY src src
 
-# For non-package applications, COPY source files here rather than in the --no-editable step
-# in the python_builder stage.
+# Add src to PYTHONPATH so bank_app module can be imported
+ENV PYTHONPATH="${APP_HOME}/src:${PYTHONPATH}"
 
 # Give access to the entire home folder to the new user so that files and folders can be written
 # there. Some packages such as matplotlib, want to write to the home folder.
@@ -106,9 +106,9 @@ RUN chown -R user:user ${HOME}
 # Override CMD below for multi-service support
 ENV SERVICE=fastapi
 CMD ["sh", "-c", "case \"$SERVICE\" in \
-  mcp_server) uvicorn src.unk029.mcpserver:app --host 0.0.0.0 --port 8002 ;; \
-  ai_agent) uvicorn src.unk029.agent:app --host 0.0.0.0 --port 8003 ;; \
-  fastapi) uvicorn src.unk029.fastapi:app --host 0.0.0.0 --port 8001 ;; \
+  mcp_server) uvicorn bank_app.mcpserver:app --host 0.0.0.0 --port 8002 ;; \
+  ai_agent) uvicorn bank_app.agent:app --host 0.0.0.0 --port 8003 ;; \
+  fastapi) uvicorn bank_app.fastapi:app --host 0.0.0.0 --port 8001 ;; \
   *) echo \"Unknown service: $SERVICE\" && exit 1 ;; \
 esac"]
 
