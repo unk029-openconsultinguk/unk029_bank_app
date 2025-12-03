@@ -4,14 +4,16 @@ Agent calls MCP Server tools to process banking queries.
 Architecture: Agent -> MCP Server -> Bank API -> Oracle DB
 """
 
-from fastapi import FastAPI, Request
-from pydantic import BaseModel
-import google.generativeai as genai
-import os
-from dotenv import load_dotenv
-import httpx
-import json
 from datetime import datetime, timedelta
+import json
+import os
+
+from dotenv import load_dotenv
+import google.generativeai as genai
+import httpx
+from pydantic import BaseModel
+
+from fastapi import FastAPI, Request
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -19,9 +21,11 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 app = FastAPI(title="UNK029 Root Banking Agent")
 
+
 # Request/Response models
 class ChatRequest(BaseModel):
     message: str
+
 
 class ChatResponse(BaseModel):
     reply: str
@@ -31,6 +35,7 @@ class ChatResponse(BaseModel):
 session_state = {}
 response_cache = {}
 CACHE_TTL = 300  # 5 minutes
+
 
 def get_cached_response(message: str) -> str | None:
     """Get cached response if available and not expired."""
@@ -44,6 +49,7 @@ def get_cached_response(message: str) -> str | None:
             del response_cache[cache_key]
     return None
 
+
 def cache_response(message: str, response: str) -> None:
     """Cache response with current timestamp."""
     cache_key = message.lower().strip()
@@ -51,6 +57,7 @@ def cache_response(message: str, response: str) -> None:
     if len(response_cache) > 100:
         oldest_key = min(response_cache.keys(), key=lambda k: response_cache[k][1])
         del response_cache[oldest_key]
+
 
 def _get_session_key(request: Request) -> str:
     """Get session key from client IP."""
@@ -61,96 +68,84 @@ def call_mcp_tool(tool_name: str, tool_input: dict) -> dict:
     """
     Call MCP Server tools via REST endpoints.
     Agent communicates with MCP Server to execute banking operations.
-    
+
     Args:
         tool_name: Name of the tool (get_account_info, deposit_funds, withdraw_funds)
         tool_input: Tool parameters
-        
+
     Returns:
         Tool result as dict
     """
     try:
         if not tool_input:
             return {"error": "Invalid tool input"}
-            
+
         with httpx.Client(timeout=10.0) as client:
             mcp_url = "http://unk029_mcp_server:8002"
-            
+
             print(f"DEBUG: Calling MCP tool {tool_name} with input: {tool_input}", flush=True)
-            
+
             if tool_name == "get_account_info":
                 account_no = int(tool_input.get("account_no", 0))
                 response = client.get(f"{mcp_url}/account/{account_no}")
                 if response.status_code == 200:
                     data = response.json()
-                    return {
-                        "success": True,
-                        "data": data
-                    }
+                    return {"success": True, "data": data}
                 else:
                     return {"error": f"Account {account_no} not found"}
-                    
+
             elif tool_name == "deposit_funds":
                 account_no = int(tool_input.get("account_no", 0))
                 amount = float(tool_input.get("amount", 0))
                 response = client.patch(
-                    f"{mcp_url}/account/{account_no}/topup",
-                    json={"amount": amount}
+                    f"{mcp_url}/account/{account_no}/topup", json={"amount": amount}
                 )
                 if response.status_code == 200:
                     data = response.json()
-                    return {
-                        "success": True,
-                        "data": data
-                    }
+                    return {"success": True, "data": data}
                 else:
                     return {"error": "Deposit failed"}
-                    
+
             elif tool_name == "withdraw_funds":
                 account_no = int(tool_input.get("account_no", 0))
                 amount = float(tool_input.get("amount", 0))
                 response = client.patch(
-                    f"{mcp_url}/account/{account_no}/withdraw",
-                    json={"amount": amount}
+                    f"{mcp_url}/account/{account_no}/withdraw", json={"amount": amount}
                 )
                 if response.status_code == 200:
                     data = response.json()
-                    return {
-                        "success": True,
-                        "data": data
-                    }
+                    return {"success": True, "data": data}
                 else:
                     return {"error": "Withdrawal failed"}
             else:
                 return {"error": f"Unknown tool: {tool_name}"}
-                
+
     except Exception as e:
         print(f"Tool execution error: {e}", flush=True)
-        return {"error": f"Failed to call tool: {str(e)}"}
+        return {"error": f"Failed to call tool: {e!s}"}
 
 
 async def process_chat(message: str, request: Request = None) -> str:
     """
     Process user message with Gemini AI using MCP Server tools.
-    
+
     Args:
         message: User message
         request: FastAPI request object
-        
+
     Returns:
         AI response
     """
-    message_lower = message.lower().strip()
-    
     # Check cache first
     cached = get_cached_response(message)
     if cached:
         return cached
-    
+
     print(f"DEBUG: Processing message: {message}", flush=True)
-    
+
     # Define system prompt for the agent
-    system_prompt = """You are a friendly banking assistant. You have access to the following tools:
+    system_prompt = """You are a friendly banking assistant. \
+You have access to the following tools:
 - get_account_info: Get account balance and information
 - deposit_funds: Deposit money into an account
 - withdraw_funds: Withdraw money from an account
@@ -158,7 +153,7 @@ async def process_chat(message: str, request: Request = None) -> str:
 When the user asks about their account, use the appropriate tool to get the information.
 Always extract account number and amount from user messages.
 Respond in a friendly and helpful manner."""
-    
+
     try:
         # Create Gemini model with tools
         model = genai.GenerativeModel(
@@ -168,17 +163,16 @@ Respond in a friendly and helpful manner."""
                     function_declarations=[
                         genai.protos.FunctionDeclaration(
                             name="get_account_info",
-                            description="Get account information including balance, name, and account number",
+                            description="Get account info: balance, name, account number",
                             parameters=genai.protos.Schema(
                                 type_="OBJECT",
                                 properties={
                                     "account_no": genai.protos.Schema(
-                                        type_="INTEGER",
-                                        description="The account number to query"
+                                        type_="INTEGER", description="The account number to query"
                                     )
                                 },
-                                required=["account_no"]
-                            )
+                                required=["account_no"],
+                            ),
                         ),
                         genai.protos.FunctionDeclaration(
                             name="deposit_funds",
@@ -188,15 +182,14 @@ Respond in a friendly and helpful manner."""
                                 properties={
                                     "account_no": genai.protos.Schema(
                                         type_="INTEGER",
-                                        description="The account number to deposit to"
+                                        description="The account number to deposit to",
                                     ),
                                     "amount": genai.protos.Schema(
-                                        type_="NUMBER",
-                                        description="The amount to deposit in GBP"
-                                    )
+                                        type_="NUMBER", description="The amount to deposit in GBP"
+                                    ),
                                 },
-                                required=["account_no", "amount"]
-                            )
+                                required=["account_no", "amount"],
+                            ),
                         ),
                         genai.protos.FunctionDeclaration(
                             name="withdraw_funds",
@@ -206,49 +199,48 @@ Respond in a friendly and helpful manner."""
                                 properties={
                                     "account_no": genai.protos.Schema(
                                         type_="INTEGER",
-                                        description="The account number to withdraw from"
+                                        description="The account number to withdraw from",
                                     ),
                                     "amount": genai.protos.Schema(
-                                        type_="NUMBER",
-                                        description="The amount to withdraw in GBP"
-                                    )
+                                        type_="NUMBER", description="The amount to withdraw in GBP"
+                                    ),
                                 },
-                                required=["account_no", "amount"]
-                            )
+                                required=["account_no", "amount"],
+                            ),
                         ),
                     ]
                 )
             ],
-            system_instruction=system_prompt
+            system_instruction=system_prompt,
         )
-        
+
         # Initial chat with Gemini
         print(f"DEBUG: Calling Gemini with message: {message}", flush=True)
         chat = model.start_chat()
         response = chat.send_message(message)
-        
+
         print(f"DEBUG: Gemini response: {response}", flush=True)
-        
+
         # Process tool calls if Gemini decides to use tools
         max_iterations = 5
         iteration = 0
-        
+
         while response.candidates[0].content.parts and iteration < max_iterations:
             iteration += 1
             last_part = response.candidates[0].content.parts[-1]
-            
+
             # Check if Gemini wants to call a tool
-            if hasattr(last_part, 'function_call'):
+            if hasattr(last_part, "function_call"):
                 tool_call = last_part.function_call
                 tool_name = tool_call.name
-                
+
                 # Debug: print the args object
                 print(f"DEBUG: Raw args object: {tool_call.args}", flush=True)
                 print(f"DEBUG: Args type: {type(tool_call.args)}", flush=True)
-                
+
                 # Simple direct access to args fields
                 tool_args = {}
-                if hasattr(tool_call, 'args') and tool_call.args:
+                if hasattr(tool_call, "args") and tool_call.args:
                     # Try to convert to dict by accessing the internal structure
                     try:
                         # The args is a Struct protobuf - access via subscript
@@ -258,57 +250,66 @@ Respond in a friendly and helpful manner."""
                         print(f"DEBUG: Subscript access failed: {e}", flush=True)
                         # Try attribute access
                         try:
-                            if hasattr(tool_call.args, 'account_no'):
-                                tool_args['account_no'] = int(tool_call.args.account_no)
-                            if hasattr(tool_call.args, 'amount'):
-                                tool_args['amount'] = float(tool_call.args.amount)
+                            if hasattr(tool_call.args, "account_no"):
+                                tool_args["account_no"] = int(tool_call.args.account_no)
+                            if hasattr(tool_call.args, "amount"):
+                                tool_args["amount"] = float(tool_call.args.amount)
                         except Exception as e2:
                             print(f"DEBUG: Attribute access failed: {e2}", flush=True)
-                
+
                 # Convert float to int for account_no
                 if "account_no" in tool_args and isinstance(tool_args["account_no"], float):
                     tool_args["account_no"] = int(tool_args["account_no"])
-                
+
                 print(f"DEBUG: Gemini called tool: {tool_name} with args: {tool_args}", flush=True)
-                
+
                 # Call the MCP tool
                 tool_result = call_mcp_tool(tool_name, tool_args)
-                
+
                 print(f"DEBUG: Tool result: {tool_result}", flush=True)
-                
+
                 # Send tool result back to Gemini as a text message
                 # Convert the result to a readable format
                 if tool_result.get("success"):
-                    result_text = f"Tool '{tool_name}' returned: {json.dumps(tool_result.get('data', {}))}"
+                    data = json.dumps(tool_result.get("data", {}))
+                    result_text = f"Tool '{tool_name}' returned: {data}"
                 else:
-                    result_text = f"Tool '{tool_name}' error: {tool_result.get('error', 'Unknown error')}"
-                
+                    err = tool_result.get("error", "Unknown error")
+                    result_text = f"Tool '{tool_name}' error: {err}"
+
                 # Send result and let Gemini generate response
                 response = chat.send_message(result_text)
-                print(f"DEBUG: Response after tool result: {response.candidates[0].content.parts if response.candidates else 'No candidates'}", flush=True)
+                parts = response.candidates[0].content.parts if response.candidates else None
+                print(f"DEBUG: Response after tool result: {parts}", flush=True)
                 # Break after tool execution - let Gemini generate final response
                 break
             else:
                 # No more tool calls, break the loop
                 break
-        
+
         # Extract final text response from Gemini
         final_response = ""
         if response.candidates:
             for part in response.candidates[0].content.parts:
-                if hasattr(part, 'text') and part.text:
+                if hasattr(part, "text") and part.text:
                     final_response += part.text
-        
+
         # Fallback response if no text generated
         if not final_response:
-            final_response = "I'm here to help with your banking needs. Please ask about your account balance, or if you'd like to deposit or withdraw funds."
-        
+            final_response = (
+                "I'm here to help with your banking needs. "
+                "Please ask about your account balance, or deposit/withdraw funds."
+            )
+
         cache_response(message, final_response)
         return final_response
-        
+
     except Exception as e:
         print(f"Gemini error: {e}", flush=True)
-        fallback = "Hello! I'm your banking assistant. Ask me about your account balance, deposits, or withdrawals."
+        fallback = (
+            "Hello! I'm your banking assistant. "
+            "Ask me about your account balance, deposits, or withdrawals."
+        )
         cache_response(message, fallback)
         return fallback
 
@@ -317,7 +318,7 @@ Respond in a friendly and helpful manner."""
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(chat: ChatRequest, request: Request):
     """Main chat endpoint - process user message via Gemini AI with MCP tools."""
-    print(f"=== AI AGENT CHAT ENDPOINT ===", flush=True)
+    print("=== AI AGENT CHAT ENDPOINT ===", flush=True)
     print(f"Message: {chat.message}", flush=True)
     reply = await process_chat(chat.message, request)
     print(f"Reply: {reply[:100]}...", flush=True)
@@ -333,4 +334,5 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8003)
