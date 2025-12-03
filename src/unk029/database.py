@@ -2,6 +2,7 @@
 Database configuration and connection management for Oracle.
 """
 
+from collections.abc import Generator
 from contextlib import contextmanager
 import os
 
@@ -30,14 +31,14 @@ class DatabaseConfig:
 _default_config = DatabaseConfig()
 
 
-def get_connection(config: DatabaseConfig | None = None):
+def get_connection(config: DatabaseConfig | None = None) -> oracledb.Connection:
     """Get Oracle database connection."""
     cfg = config or _default_config
     return oracledb.connect(user=cfg.user, password=cfg.password, dsn=cfg.dsn)
 
 
 @contextmanager
-def get_cursor(config: DatabaseConfig | None = None):
+def get_cursor(config: DatabaseConfig | None = None) -> Generator[oracledb.Cursor, None, None]:
     """Context manager for database cursor."""
     conn = get_connection(config)
     cur = conn.cursor()

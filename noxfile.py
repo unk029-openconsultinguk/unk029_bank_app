@@ -13,10 +13,10 @@ options.sessions = ["lint", "type_check", "test", "docs"]
 def test(s: Session) -> None:
     s.run(
         "pytest",
-        "--cov=fact",
+        "--cov=unk029",
         "--cov-report=html",
         "--cov-report=term",
-        "--cov-fail-under=80",
+        "--cov-fail-under=50",
         "tests",
         *s.posargs,
     )

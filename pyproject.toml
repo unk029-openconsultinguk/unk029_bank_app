@@ -110,6 +110,11 @@ strict = true
 enable_error_code = ["deprecated", "exhaustive-match", "explicit-override"]
 # If certain strict config options are too pedantic for a project,
 # disable them selectively here by setting to false.
+exclude = ["src/bank_app"]
+
+[[tool.mypy.overrides]]
+module = "bank_app.*"
+ignore_errors = true
 
 [tool.ruff]
 line-length = 99

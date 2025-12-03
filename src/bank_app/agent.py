@@ -9,11 +9,10 @@ import json
 import os
 
 from dotenv import load_dotenv
+from fastapi import FastAPI, Request
 import google.generativeai as genai
 import httpx
 from pydantic import BaseModel
-
-from fastapi import FastAPI, Request
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

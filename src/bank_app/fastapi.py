@@ -3,9 +3,9 @@ FastAPI Server - Core banking API
 Handles account management and banking operations
 """
 
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from fastapi import FastAPI, HTTPException
 from unk029 import (
     AccountCreate,
     AccountNotFoundError,

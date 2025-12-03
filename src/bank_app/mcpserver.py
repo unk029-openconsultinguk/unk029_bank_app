@@ -15,13 +15,12 @@ import logging
 import os
 import traceback
 
+from fastapi import FastAPI, HTTPException, Request
 from fastmcp import FastMCP
 from google import genai
 from google.genai import types
 import httpx
 from pydantic import BaseModel
-
-from fastapi import FastAPI, HTTPException, Request
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
