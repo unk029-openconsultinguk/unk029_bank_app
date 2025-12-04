@@ -62,14 +62,15 @@ def call_mcp_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
             # Call MCP tools using the tool names defined in MCP server
             if tool_name == "get_account_info":
                 # Map to MCP tool: check_balance
+                account_no = int(tool_input.get("account_no", 0))
                 mcp_request = {
-                    "tool": "check_balance",
-                    "arguments": {"account_no": int(tool_input.get("account_no", 0))}
+                    "account_no": account_no
                 }
-                print(f"DEBUG: MCP request URL: {mcp_url}/call", flush=True)
+                # Try the direct MCP endpoint
+                print(f"DEBUG: MCP request URL: {mcp_url}/tools/check_balance", flush=True)
                 print(f"DEBUG: MCP request body: {mcp_request}", flush=True)
                 response = http_client.post(
-                    f"{mcp_url}/call",
+                    f"{mcp_url}/tools/check_balance",
                     json=mcp_request
                 )
                 print(f"DEBUG: MCP response status: {response.status_code}", flush=True)

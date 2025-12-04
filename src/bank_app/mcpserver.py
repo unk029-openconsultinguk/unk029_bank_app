@@ -162,7 +162,7 @@ async def health() -> dict[str, str]:
 
 
 # Mount MCP app at /mcp endpoint
-app.mount("/mcp", mcp.http_app)
+app.mount("/mcp", mcp.http_app())
 
 
 if __name__ == "__main__":

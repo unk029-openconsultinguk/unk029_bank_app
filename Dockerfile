@@ -51,17 +51,14 @@ COPY pyproject.toml uv.lock ./
 # Copy requirements-nexus.txt
 COPY requirements-nexus.txt ./
 
-# Install only project dependencies, as this is cached until pyproject.toml uv.lock are updated.
-# Pass credentials via build args to uv using proper UV_INDEX format
-RUN UV_EXTRA_INDEX_URL="https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}/simple/" \
-    uv sync --locked --no-default-groups --no-install-project
+# Copy in only bank_app source (unk029 comes from Nexus as a package)
+# COPY src/bank_app ./src/bank_app
 
-# Copy in source files (only bank_app, unk029 comes from Nexus).
-COPY src/bank_app ./src/bank_app
+COPY src ./src
 
-# Install the rest of the application into the virtual environment.
+# Install dependencies and application in editable mode (source files available at runtime)
 RUN UV_EXTRA_INDEX_URL="https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}/simple/" \
-    uv sync --locked --no-default-groups --no-editable
+    uv sync --locked --no-default-groups
 
 ## Final Image
 # The image used in the final image MUST match exactly to the python_builder image.
