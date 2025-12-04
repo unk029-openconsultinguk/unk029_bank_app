@@ -1,5 +1,5 @@
 [project]
-name = "unk029"
+name = "unk029-bank-app"
 # version = "1.0.0"
 dynamic = ["version"]
 description = "UNK029 Banking Library - Reusable banking operations with Oracle database support"
@@ -22,6 +22,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
+    "unk029>=0.1.2",
     "oracledb>=2.0.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
@@ -78,19 +79,20 @@ licenses = [
     "pip-licenses-cli",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+# Commented out - using unk029 package from Nexus repository instead of building locally
+#[build-system]
+#requires = ["hatchling"]
+#build-backend = "hatchling.build"
 
-[tool.hatch.version]
-path = "src/unk029/__about__.py"
+#[tool.hatch.version]
+#path = "src/unk029/__about__.py"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/unk029"]
+#[tool.hatch.build.targets.wheel]
+#packages = ["src/unk029"]
 
-[tool.poetry]
-name = "unk029"
-version = "0.1.0"
+#[tool.poetry]
+#name = "unk029"
+#version = "0.1.0"
 
 
 # For non-src directory projects, explicitly set top level model name:
@@ -102,7 +104,7 @@ version = "0.1.0"
 default-groups = "all"
 # Non-package applications can uncomment the following line and delete [build-system] section to
 # avoid being built or installed: https://docs.astral.sh/uv/reference/settings/#package
-#package = false
+package = false
 
 [tool.mypy]
 ignore_missing_imports = true
@@ -181,3 +183,12 @@ exclude_also = [
     "raise NotImplementedError",
     "@abstractmethod",
 ]
+
+[[tool.uv.index]]
+name = "nexus"
+url = "https://nexus.openconsultinguk.com/repository/sandbox/simple/"
+explicit = true
+
+[tool.uv.sources]
+unk029 = { index = "nexus" }
+

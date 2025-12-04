@@ -27,13 +27,67 @@ unk029_bank_app/
 ```
 
 ## Quick Start
-1. Clone the repo and set up your `.env` with Oracle DB credentials.
+
+### Prerequisites
+- Docker and Docker Compose
+- Python 3.12+ (for local development)
+- uv package manager (for local development)
+- Access to Nexus PyPI repository
+
+### Setup
+
+1. Clone the repo and set up your `.env` with credentials:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Oracle DB and Nexus credentials:
+   # PYPI_HOST=nexus.openconsultinguk.com/repository/sandbox/
+   # PYPI_USER=your_username
+   # PYPI_PASSWORD=your_password
+   ```
+
 2. Place your Oracle wallet files in the `wallet/` directory.
 3. Build and run with Docker Compose:
    ```bash
    docker compose up --build
    ```
-4. Access the API docs at `https://<your-domain>/docs`.
+
+4. **For local development with uv:**
+   ```bash
+   # Configure authentication from .env
+   source .env
+   export UV_INDEX_nexus="https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}simple/"
+   
+   # Sync dependencies (includes unk029 package from Nexus)
+   uv sync
+   
+   # Run the application
+   uv run uvicorn bank_app.fastapi:app --reload
+   ```
+
+5. Access the API docs at `https://<your-domain>/docs` or `http://localhost:8001/docs`.
+
+## Architecture
+
+This project uses a modular architecture with reusable packages:
+
+### unk029 Package
+The core banking library (`unk029>=0.1.2`) is published to a private Nexus repository and provides:
+- `unk029.database`: Database operations (create_account, get_account, topup_account, withdraw_account)
+- `unk029.models`: Pydantic models (Account, AccountCreate, TopUp, WithDraw)
+- `unk029.exceptions`: Custom exceptions (AccountNotFoundError, InsufficientFundsError)
+
+**Installation from Nexus:**
+The package is automatically installed during Docker build via `requirements-nexus.txt`:
+```text
+--index-url https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}/simple/
+unk029>=0.1.2
+```
+
+### Bank App Services
+- **FastAPI Server** (`bank_app.fastapi`): Core banking API using the unk029 package
+- **MCP Server** (`bank_app.mcpserver`): FastMCP tools for AI agent integration
+- **AI Agent** (`bank_app.agent`): Gemini 2.0 Flash AI agent that uses MCP tools
+- **Frontend**: React/TypeScript UI served by Nginx
 
 ## Endpoints
 - `GET /account/{account_no}`: Get account details

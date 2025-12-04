@@ -4,7 +4,7 @@ Agent calls MCP Server tools to process banking queries.
 Architecture: Agent -> MCP Server -> Bank API -> Oracle DB
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 from typing import Any
 
@@ -36,32 +36,8 @@ class ChatResponse(BaseModel):
     reply: str
 
 
-# Session state and cache
+# Session state
 session_state: dict[str, list[dict[str, str]]] = {}
-response_cache: dict[str, tuple[str, datetime]] = {}
-CACHE_TTL = 300  # 5 minutes
-
-
-def get_cached_response(message: str) -> str | None:
-    """Get cached response if available and not expired."""
-    cache_key = message.lower().strip()
-    if cache_key in response_cache:
-        cached, timestamp = response_cache[cache_key]
-        if datetime.now() - timestamp < timedelta(seconds=CACHE_TTL):
-            print(f"DEBUG: Cache hit for: {message[:50]}", flush=True)
-            return cached
-        else:
-            del response_cache[cache_key]
-    return None
-
-
-def cache_response(message: str, response: str) -> None:
-    """Cache response with current timestamp."""
-    cache_key = message.lower().strip()
-    response_cache[cache_key] = (response, datetime.now())
-    if len(response_cache) > 100:
-        oldest_key = min(response_cache.keys(), key=lambda k: response_cache[k][1])
-        del response_cache[oldest_key]
 
 
 def _get_session_key(request: Request | None) -> str:
@@ -71,7 +47,7 @@ def _get_session_key(request: Request | None) -> str:
 
 def call_mcp_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
     """
-    Call MCP Server tools via REST endpoints.
+    Call MCP Server tools via MCP HTTP protocol.
     Agent communicates with MCP Server to execute banking operations.
     """
     try:
@@ -79,40 +55,61 @@ def call_mcp_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
             return {"error": "Invalid tool input"}
 
         with httpx.Client(timeout=10.0) as http_client:
-            mcp_url = "http://unk029_mcp_server:8002"
+            mcp_url = "http://unk029_mcp_server:8002/mcp"
 
             print(f"DEBUG: Calling MCP tool {tool_name} with input: {tool_input}", flush=True)
 
+            # Call MCP tools using the tool names defined in MCP server
             if tool_name == "get_account_info":
-                account_no = int(tool_input.get("account_no", 0))
-                response = http_client.get(f"{mcp_url}/account/{account_no}")
+                # Map to MCP tool: check_balance
+                mcp_request = {
+                    "tool": "check_balance",
+                    "arguments": {"account_no": int(tool_input.get("account_no", 0))}
+                }
+                print(f"DEBUG: MCP request URL: {mcp_url}/call", flush=True)
+                print(f"DEBUG: MCP request body: {mcp_request}", flush=True)
+                response = http_client.post(
+                    f"{mcp_url}/call",
+                    json=mcp_request
+                )
+                print(f"DEBUG: MCP response status: {response.status_code}", flush=True)
+                print(f"DEBUG: MCP response body: {response.text[:500]}", flush=True)
                 if response.status_code == 200:
-                    data = response.json()
-                    return {"success": True, "data": data}
+                    return response.json()
                 else:
-                    return {"error": f"Account {account_no} not found"}
+                    return {"error": f"Account not found"}
 
             elif tool_name == "deposit_funds":
-                account_no = int(tool_input.get("account_no", 0))
-                amount = float(tool_input.get("amount", 0))
-                response = http_client.patch(
-                    f"{mcp_url}/account/{account_no}/topup", json={"amount": amount}
+                # Map to MCP tool: deposit_money
+                response = http_client.post(
+                    f"{mcp_url}/call",
+                    json={
+                        "tool": "deposit_money",
+                        "arguments": {
+                            "account_no": int(tool_input.get("account_no", 0)),
+                            "amount": float(tool_input.get("amount", 0))
+                        }
+                    }
                 )
                 if response.status_code == 200:
-                    data = response.json()
-                    return {"success": True, "data": data}
+                    return response.json()
                 else:
                     return {"error": "Deposit failed"}
 
             elif tool_name == "withdraw_funds":
-                account_no = int(tool_input.get("account_no", 0))
-                amount = float(tool_input.get("amount", 0))
-                response = http_client.patch(
-                    f"{mcp_url}/account/{account_no}/withdraw", json={"amount": amount}
+                # Map to MCP tool: withdraw_money
+                response = http_client.post(
+                    f"{mcp_url}/call",
+                    json={
+                        "tool": "withdraw_money",
+                        "arguments": {
+                            "account_no": int(tool_input.get("account_no", 0)),
+                            "amount": float(tool_input.get("amount", 0))
+                        }
+                    }
                 )
                 if response.status_code == 200:
-                    data = response.json()
-                    return {"success": True, "data": data}
+                    return response.json()
                 else:
                     return {"error": "Withdrawal failed"}
             else:
@@ -181,36 +178,69 @@ AGENT_TOOLS = [
     )
 ]
 
-SYSTEM_PROMPT = """You are a friendly banking assistant. \
-You have access to the following tools:
-- get_account_info: Get account balance and information
-- deposit_funds: Deposit money into an account
-- withdraw_funds: Withdraw money from an account
+SYSTEM_PROMPT = """You are a helpful banking assistant with access to banking tools.
 
-When the user asks about their account, use the appropriate tool to get the information.
-Always extract account number and amount from user messages.
-Respond in a friendly and helpful manner."""
+IMPORTANT RULES:
+1. When a user asks about "my account" or "my balance", ALWAYS ask for their account number
+2. If the user provides JUST A NUMBER (like "1", "2", "123", etc.) after being asked for an account number, treat that number as the account number and call get_account_info with it
+3. Account numbers are integers - if user says "1", use account_no=1
+4. NEVER ask for the account number again if the user already provided a number
+
+Available tools:
+- get_account_info(account_no): Get account balance and details
+- deposit_funds(account_no, amount): Deposit money
+- withdraw_funds(account_no, amount): Withdraw money
+
+Be friendly and helpful."""
 
 
 async def process_chat(message: str, request: Request | None = None) -> str:
     """
     Process user message with Google ADK (Gemini) using MCP Server tools.
     """
-    # Check cache first
-    cached = get_cached_response(message)
-    if cached:
-        return cached
-
+    # Get session key
+    session_key = _get_session_key(request)
+    
+    # Initialize session history if needed
+    if session_key not in session_state:
+        session_state[session_key] = []
+    
     print(f"DEBUG: Processing message: {message}", flush=True)
+    print(f"DEBUG: Session history length: {len(session_state[session_key])}", flush=True)
 
     try:
-        # Build full prompt with system instruction
-        full_message = f"{SYSTEM_PROMPT}\n\nUser: {message}"
+        # Build conversation history with system instruction
+        conversation_contents = []
+        
+        # ALWAYS add system instruction at the start
+        conversation_contents.append(
+            types.Content(role="user", parts=[types.Part(text=SYSTEM_PROMPT)])
+        )
+        conversation_contents.append(
+            types.Content(role="model", parts=[types.Part(text="Understood. I will follow these rules exactly.")])
+        )
+        
+        # Add previous conversation history
+        for i, hist_msg in enumerate(session_state[session_key]):
+            print(f"DEBUG: History {i}: {hist_msg['role']}: {hist_msg['content'][:50]}...", flush=True)
+            if hist_msg["role"] == "user":
+                conversation_contents.append(
+                    types.Content(role="user", parts=[types.Part(text=hist_msg["content"])])
+                )
+            else:
+                conversation_contents.append(
+                    types.Content(role="model", parts=[types.Part(text=hist_msg["content"])])
+                )
+        
+        # Add current user message
+        conversation_contents.append(
+            types.Content(role="user", parts=[types.Part(text=message)])
+        )
 
         # Call Gemini with tools
         response = client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=[types.Content(role="user", parts=[types.Part(text=full_message)])],
+            contents=conversation_contents,
             config=types.GenerateContentConfig(tools=list(AGENT_TOOLS), temperature=0.3),
         )
 
@@ -268,8 +298,7 @@ async def process_chat(message: str, request: Request | None = None) -> str:
             # Continue conversation with tool result
             response = client.models.generate_content(
                 model="gemini-2.0-flash",
-                contents=[
-                    types.Content(role="user", parts=[types.Part(text=full_message)]),
+                contents=conversation_contents + [
                     content,
                     types.Content(role="function", parts=[function_response]),
                 ],
@@ -292,7 +321,14 @@ async def process_chat(message: str, request: Request | None = None) -> str:
                 "Please ask about your account balance, or deposit/withdraw funds."
             )
 
-        cache_response(message, final_response)
+        # Save conversation to session history
+        session_state[session_key].append({"role": "user", "content": message})
+        session_state[session_key].append({"role": "assistant", "content": final_response})
+        
+        # Keep only last 10 exchanges to avoid context overflow
+        if len(session_state[session_key]) > 20:
+            session_state[session_key] = session_state[session_key][-20:]
+
         return final_response
 
     except Exception as e:
@@ -301,7 +337,6 @@ async def process_chat(message: str, request: Request | None = None) -> str:
             "Hello! I'm your banking assistant. "
             "Ask me about your account balance, deposits, or withdrawals."
         )
-        cache_response(message, fallback)
         return fallback
 
 
@@ -314,6 +349,17 @@ async def chat_endpoint(chat: ChatRequest, request: Request) -> ChatResponse:
     reply = await process_chat(chat.message, request)
     print(f"Reply: {reply[:100]}...", flush=True)
     return ChatResponse(reply=reply)
+
+
+# Clear session endpoint
+@app.post("/clear-session")
+async def clear_session_endpoint(request: Request) -> dict[str, str]:
+    """Clear conversation history for the current session."""
+    session_key = _get_session_key(request)
+    if session_key in session_state:
+        del session_state[session_key]
+        print(f"DEBUG: Cleared session for {session_key}", flush=True)
+    return {"status": "ok", "message": "Session cleared"}
 
 
 # Health check

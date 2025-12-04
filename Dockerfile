@@ -40,26 +40,28 @@ RUN pip install "uv==${UV_VERSION}"
 # absolute symlinks in it.
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 
+# Accept build args for Nexus authentication
+ARG PYPI_HOST
+ARG PYPI_USER
+ARG PYPI_PASSWORD
+
 # Copy in project dependency specification.
 COPY pyproject.toml uv.lock ./
 
-# Copy files needed for hatchling build
-COPY src/unk029/__about__.py src/unk029/__about__.py
-COPY src/unk029/__init__.py src/unk029/__init__.py
-COPY README.md ./
+# Copy requirements-nexus.txt
+COPY requirements-nexus.txt ./
 
 # Install only project dependencies, as this is cached until pyproject.toml uv.lock are updated.
-RUN uv sync --locked --no-default-groups --no-install-project
+# Pass credentials via build args to uv using proper UV_INDEX format
+RUN UV_EXTRA_INDEX_URL="https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}/simple/" \
+    uv sync --locked --no-default-groups --no-install-project
 
-# Copy in source files.
-# README.md is required for the package to build. It can be ommited for non-package applications.
-COPY README.md ./
-COPY src src
+# Copy in source files (only bank_app, unk029 comes from Nexus).
+COPY src/bank_app ./src/bank_app
 
 # Install the rest of the application into the virtual environment.
-# Omit this step if your project is a non-package application and copy the source in the second
-# stage instead.
-RUN uv sync --locked --no-default-groups --no-editable
+RUN UV_EXTRA_INDEX_URL="https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}/simple/" \
+    uv sync --locked --no-default-groups --no-editable
 
 ## Final Image
 # The image used in the final image MUST match exactly to the python_builder image.
@@ -70,7 +72,7 @@ ENV PYTHONBUFFERED=1
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 
 ENV HOME=/home/user
-ENV APP_HOME=${HOME}/app
+ENV APP_HOME=${HOME}/apps
 
 # Create the home directory for the new user.
 RUN mkdir -p ${HOME}

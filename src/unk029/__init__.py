@@ -1,5 +1,5 @@
 from unk029.__about__ import __version__
-from unk029.database import DatabaseConfig, get_connection, get_cursor
+from unk029.database import DatabaseConfig, create_account, get_account, get_connection, get_cursor, topup_account, withdraw_account
 from unk029.exceptions import AccountError, AccountNotFoundError, InsufficientFundsError
 from unk029.models import Account, AccountCreate, TopUp, WithDraw
 
@@ -13,6 +13,10 @@ __all__ = [
     "TopUp",
     "WithDraw",
     "__version__",
+    "create_account",
+    "get_account",
     "get_connection",
     "get_cursor",
+    "topup_account",
+    "withdraw_account",
 ]

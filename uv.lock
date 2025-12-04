@@ -2221,7 +2221,8 @@ wheels = [
 
 [[package]]
 name = "unk029"
-source = { editable = "." }
+version = "0.1.2"
+source = { registry = "https://nexus.openconsultinguk.com/repository/sandbox/simple/" }
 dependencies = [
     { name = "fastapi" },
     { name = "fastmcp" },
@@ -2231,6 +2232,25 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "rich" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+wheels = [
+    { url = "https://nexus.openconsultinguk.com/repository/sandbox/packages/unk029/0.1.2/unk029-0.1.2-py3-none-any.whl", hash = "sha256:ddfc32c32fe77bf87b5bda138f39404fc219290bc9b15be70824bdda505ca163" },
+]
+
+[[package]]
+name = "unk029-bank-app"
+source = { virtual = "." }
+dependencies = [
+    { name = "fastapi" },
+    { name = "fastmcp" },
+    { name = "google-genai" },
+    { name = "httpx" },
+    { name = "oracledb" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "rich" },
+    { name = "unk029" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -2278,6 +2298,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "rich" },
+    { name = "unk029", specifier = ">=0.1.2", index = "https://nexus.openconsultinguk.com/repository/sandbox/simple/" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.20.0" },
 ]
 provides-extras = ["dev"]
