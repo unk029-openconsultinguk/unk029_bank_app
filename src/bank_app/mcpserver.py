@@ -61,7 +61,7 @@ def bank_action(action: str, payload: dict[str, Any]) -> dict[str, Any]:
 
         return {"success": True, "data": response.json()}
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.exception("bank_action failed")
         return {"error": str(exc)}
 
