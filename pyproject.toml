@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Office/Business :: Financial",
     "Topic :: Database",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
 dependencies = [
     "unk029>=0.0.1",
     "oracledb>=2.0.0",
