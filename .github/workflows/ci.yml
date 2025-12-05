@@ -54,15 +54,32 @@ jobs:
           restore-keys: uv-
 
       - name: Install dependencies
+        env:
+          UV_INDEX_USERNAME: ${{ vars.OC_USERNAME }}
+          UV_INDEX_PASSWORD: ${{ secrets.OC_PASSWORD }}
         run: uv sync
 
+      - name: Debug Nexus Auth
+        run: |
+          echo "Username: ${{ vars.OC_USERNAME }}"
+          echo "Publish URL: ${{ vars.OC_PUBLISH_URL }}"
+          echo "Python version: ${{ env.PYTHON_VERSION }}"
       - name: Run lint
+        env:
+          UV_INDEX_USERNAME: ${{ vars.OC_USERNAME }}
+          UV_INDEX_PASSWORD: ${{ secrets.OC_PASSWORD }}
         run: uv run nox -s lint
 
       - name: Run type check
+        env:
+          UV_INDEX_USERNAME: ${{ vars.OC_USERNAME }}
+          UV_INDEX_PASSWORD: ${{ secrets.OC_PASSWORD }}
         run: uv run nox -s type_check
 
       - name: Run tests
+        env:
+          UV_INDEX_USERNAME: ${{ vars.OC_USERNAME }}
+          UV_INDEX_PASSWORD: ${{ secrets.OC_PASSWORD }}
         run: uv run nox -s test-${{ env.PYTHON_VERSION }}
 
   # -----------------------
@@ -144,6 +161,9 @@ jobs:
           version: ${{ env.UV_VERSION }}
 
       - name: Install dependencies
+        env:
+          UV_INDEX_USERNAME: ${{ vars.OC_USERNAME }}
+          UV_INDEX_PASSWORD: ${{ secrets.OC_PASSWORD }}
         run: uv sync
 
       - name: Install Hatch

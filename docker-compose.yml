@@ -1,7 +1,12 @@
 version: "3.8"
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        PYPI_HOST: ${PYPI_HOST}
+        PYPI_USER: ${PYPI_USER}
+        PYPI_PASSWORD: ${PYPI_PASSWORD}
     container_name: unk029_bank_app
     expose:
       - "8001"
@@ -16,7 +21,12 @@ services:
     restart: unless-stopped
 
   mcp_server:
-    build: .
+    build:
+      context: .
+      args:
+        PYPI_HOST: ${PYPI_HOST}
+        PYPI_USER: ${PYPI_USER}
+        PYPI_PASSWORD: ${PYPI_PASSWORD}
     container_name: unk029_mcp_server
     environment:
       SERVICE: mcp_server
@@ -30,7 +40,12 @@ services:
     restart: unless-stopped
 
   ai_agent:
-    build: .
+    build:
+      context: .
+      args:
+        PYPI_HOST: ${PYPI_HOST}
+        PYPI_USER: ${PYPI_USER}
+        PYPI_PASSWORD: ${PYPI_PASSWORD}
     container_name: unk029_ai_agent
     environment:
       SERVICE: ai_agent
