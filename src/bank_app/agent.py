@@ -4,7 +4,6 @@ Agent calls MCP Server tools to process banking queries.
 Architecture: Agent -> MCP Server -> Bank API -> Oracle DB
 """
 
-from datetime import datetime
 import os
 from typing import Any
 
@@ -62,9 +61,7 @@ def call_mcp_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
             if tool_name == "get_account_info":
                 account_no = int(tool_input.get("account_no", 0))
                 print(f"DEBUG: Fetching account {account_no}", flush=True)
-                response = http_client.get(
-                    f"{bank_api_url}/account/{account_no}"
-                )
+                response = http_client.get(f"{bank_api_url}/account/{account_no}")
                 print(f"DEBUG: Response status: {response.status_code}", flush=True)
                 if response.status_code == 200:
                     data = response.json()
@@ -72,7 +69,7 @@ def call_mcp_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
                         "success": True,
                         "account_no": data.get("account_no"),
                         "name": data.get("name"),
-                        "balance": data.get("balance")
+                        "balance": data.get("balance"),
                     }
                 else:
                     return {"success": False, "error": f"Account {account_no} not found"}
@@ -82,8 +79,7 @@ def call_mcp_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
                 amount = float(tool_input.get("amount", 0))
                 print(f"DEBUG: Depositing £{amount} to account {account_no}", flush=True)
                 response = http_client.patch(
-                    f"{bank_api_url}/account/{account_no}/topup",
-                    json={"amount": amount}
+                    f"{bank_api_url}/account/{account_no}/topup", json={"amount": amount}
                 )
                 print(f"DEBUG: Response status: {response.status_code}", flush=True)
                 if response.status_code == 200:
@@ -92,7 +88,7 @@ def call_mcp_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
                         "success": True,
                         "account_no": data.get("account_no"),
                         "name": data.get("name"),
-                        "new_balance": data.get("new_balance")
+                        "new_balance": data.get("new_balance"),
                     }
                 else:
                     return {"success": False, "error": "Deposit failed"}
@@ -102,8 +98,7 @@ def call_mcp_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
                 amount = float(tool_input.get("amount", 0))
                 print(f"DEBUG: Withdrawing £{amount} from account {account_no}", flush=True)
                 response = http_client.patch(
-                    f"{bank_api_url}/account/{account_no}/withdraw",
-                    json={"amount": amount}
+                    f"{bank_api_url}/account/{account_no}/withdraw", json={"amount": amount}
                 )
                 print(f"DEBUG: Response status: {response.status_code}", flush=True)
                 if response.status_code == 200:
@@ -112,11 +107,14 @@ def call_mcp_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
                         "success": True,
                         "account_no": data.get("account_no"),
                         "name": data.get("name"),
-                        "new_balance": data.get("new_balance")
+                        "new_balance": data.get("new_balance"),
                     }
                 else:
                     error_msg = response.text
-                    return {"success": False, "error": error_msg if error_msg else "Withdrawal failed"}
+                    return {
+                        "success": False,
+                        "error": error_msg if error_msg else "Withdrawal failed",
+                    }
             else:
                 return {"success": False, "error": f"Unknown tool: {tool_name}"}
 
@@ -187,7 +185,8 @@ SYSTEM_PROMPT = """You are a helpful banking assistant with access to banking to
 
 IMPORTANT RULES:
 1. When a user asks about "my account" or "my balance", ALWAYS ask for their account number
-2. If the user provides JUST A NUMBER (like "1", "2", "123", etc.) after being asked for an account number, treat that number as the account number and call get_account_info with it
+2. If the user provides JUST A NUMBER (like "1", "2", "123", etc.) after being asked for
+   an account number, treat that number as the account number and call get_account_info with it
 3. Account numbers are integers - if user says "1", use account_no=1
 4. NEVER ask for the account number again if the user already provided a number
 
@@ -205,29 +204,36 @@ async def process_chat(message: str, request: Request | None = None) -> str:
     """
     # Get session key
     session_key = _get_session_key(request)
-    
+
     # Initialize session history if needed
     if session_key not in session_state:
         session_state[session_key] = []
-    
+
     print(f"DEBUG: Processing message: {message}", flush=True)
     print(f"DEBUG: Session history length: {len(session_state[session_key])}", flush=True)
 
     try:
         # Build conversation history with system instruction
         conversation_contents = []
-        
+
         # ALWAYS add system instruction at the start
         conversation_contents.append(
             types.Content(role="user", parts=[types.Part(text=SYSTEM_PROMPT)])
         )
         conversation_contents.append(
-            types.Content(role="model", parts=[types.Part(text="Understood. I will follow these rules exactly.")])
+            types.Content(
+                role="model",
+                parts=[types.Part(text="Understood. I will follow these rules exactly.")],
+            )
         )
-        
+
         # Add previous conversation history
         for i, hist_msg in enumerate(session_state[session_key]):
-            print(f"DEBUG: History {i}: {hist_msg['role']}: {hist_msg['content'][:50]}...", flush=True)
+            content_preview = hist_msg["content"][:50]
+            print(
+                f"DEBUG: History {i}: {hist_msg['role']}: {content_preview}...",
+                flush=True,
+            )
             if hist_msg["role"] == "user":
                 conversation_contents.append(
                     types.Content(role="user", parts=[types.Part(text=hist_msg["content"])])
@@ -236,11 +242,9 @@ async def process_chat(message: str, request: Request | None = None) -> str:
                 conversation_contents.append(
                     types.Content(role="model", parts=[types.Part(text=hist_msg["content"])])
                 )
-        
+
         # Add current user message
-        conversation_contents.append(
-            types.Content(role="user", parts=[types.Part(text=message)])
-        )
+        conversation_contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
 
         # Call Gemini with tools
         response = client.models.generate_content(
@@ -303,7 +307,8 @@ async def process_chat(message: str, request: Request | None = None) -> str:
             # Continue conversation with tool result
             response = client.models.generate_content(
                 model="gemini-2.0-flash",
-                contents=conversation_contents + [
+                contents=conversation_contents
+                + [
                     content,
                     types.Content(role="function", parts=[function_response]),
                 ],
@@ -329,7 +334,7 @@ async def process_chat(message: str, request: Request | None = None) -> str:
         # Save conversation to session history
         session_state[session_key].append({"role": "user", "content": message})
         session_state[session_key].append({"role": "assistant", "content": final_response})
-        
+
         # Keep only last 10 exchanges to avoid context overflow
         if len(session_state[session_key]) > 20:
             session_state[session_key] = session_state[session_key][-20:]

@@ -45,6 +45,7 @@ BANKING_INFO = {
 
 # MCP TOOLS (exposed via FastMCP)
 
+
 @mcp.tool()
 def check_balance(account_no: int) -> dict[str, Any]:
     """Check account balance"""
@@ -132,6 +133,7 @@ def get_bank_info(topic: str) -> dict[str, Any]:
 # FASTAPI ENDPOINTS
 # ============================================================================
 
+
 class ChatRequest(BaseModel):
     message: str
 
@@ -146,15 +148,15 @@ async def chat(request: ChatRequest, http_request: Request) -> dict[str, str]:
         # Get client identifier (IP address or default)
         client_id = http_request.client.host if http_request.client else "default"
         logger.info(f"User [{client_id}]: {request.message}")
-        
+
         # Process with simple client (maintains session per client)
         reply = simple_client.process_query(request.message, client_id=client_id)
-        
+
         return {"reply": reply}
-                
+
     except Exception as e:
         logger.error(f"Error: {e}")
-        return {"reply": f"Error: {str(e)}"}
+        return {"reply": f"Error: {e!s}"}
 
 
 @app.get("/health")
@@ -169,4 +171,5 @@ app.mount("/mcp", mcp.http_app())
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8002)
