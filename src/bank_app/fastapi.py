@@ -35,7 +35,7 @@ class ChatResponse(BaseModel):
 
 
 # ============== API Endpoints ==============
-@app.get("/account/transfer")
+@app.post("/account/transfer")
 def transfer_account_endpoint(transfer: Transfer) -> dict[str, Any]:
     try:
         return transfer_account(transfer)

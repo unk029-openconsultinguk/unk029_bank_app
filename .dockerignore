@@ -3,6 +3,7 @@
 
 # Except the following.
 !src
+!src/**
 !LICENSE.txt
 !pyproject.toml
 !uv.lock

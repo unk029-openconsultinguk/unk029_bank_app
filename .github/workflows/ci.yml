@@ -162,8 +162,6 @@ jobs:
 
       - name: Install dependencies
         env:
-          UV_INDEX_USERNAME: ${{ vars.OC_USERNAME }}
-          UV_INDEX_PASSWORD: ${{ secrets.OC_PASSWORD }}
         run: uv sync
 
       - name: Install Hatch
