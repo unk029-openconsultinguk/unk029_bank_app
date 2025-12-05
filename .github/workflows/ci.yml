@@ -54,7 +54,10 @@ jobs:
           restore-keys: uv-
 
       - name: Install dependencies
-        run: uv sync
+        run: |
+          export UV_INDEX_USERNAME="${{ vars.OC_USERNAME }}"
+          export UV_INDEX_PASSWORD="${{ secrets.OC_PASSWORD }}"
+          uv sync
 
       - name: Run lint
         run: uv run nox -s lint
