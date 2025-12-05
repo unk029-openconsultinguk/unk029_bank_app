@@ -12,6 +12,7 @@ class AccountCreate(BaseModel):
     name: str
     balance: float = 0.0
     password: str
+    sortcode: str = "00-00-00"
 
 
 class TopUp(BaseModel):
@@ -32,3 +33,12 @@ class Account(BaseModel):
     account_no: int
     name: str
     balance: float
+    sortcode: str
+
+
+class Transfer(BaseModel):
+    """Model for a transfer operation."""
+
+    from_account_no: int
+    to_account_no: int
+    amount: float

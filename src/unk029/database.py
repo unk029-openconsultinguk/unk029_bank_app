@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 import oracledb
 
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
-from unk029.models import AccountCreate, TopUp, WithDraw
+from unk029.models import AccountCreate, TopUp, Transfer, WithDraw
 
 load_dotenv()
 
@@ -61,12 +61,12 @@ def get_account(account_no: int, config: DatabaseConfig | None = None) -> dict[s
     """Get account details by account number."""
     with get_cursor(config) as cur:
         cur.execute(
-            "SELECT account_no, name, balance FROM accounts WHERE account_no = :id",
+            "SELECT account_no, name, balance, sortcode FROM accounts WHERE account_no = :id",
             {"id": account_no},
         )
         row = cur.fetchone()
         if row:
-            return {"account_no": row[0], "name": row[1], "balance": row[2]}
+            return {"account_no": row[0], "name": row[1], "balance": row[2], "sortcode": row[3]}
         raise AccountNotFoundError(account_no)
 
 
@@ -80,16 +80,22 @@ def create_account(account: AccountCreate, config: DatabaseConfig | None = None)
 
         # Insert new account
         cur.execute(
-            "INSERT INTO accounts (account_no, name, balance, password) "
-            "VALUES (:id, :name, :balance, :password)",
+            "INSERT INTO accounts (account_no, name, balance, password, sortcode) "
+            "VALUES (:id, :name, :balance, :password, :sortcode)",
             {
                 "id": account_no,
                 "name": account.name,
                 "balance": account.balance,
                 "password": account.password,
+                "sortcode": account.sortcode,
             },
         )
-        return {"account_no": account_no, "name": account.name, "balance": account.balance}
+        return {
+            "account_no": account_no,
+            "name": account.name,
+            "balance": account.balance,
+            "sortcode": account.sortcode,
+        }
 
 
 def topup_account(
@@ -135,3 +141,50 @@ def withdraw_account(
             {"balance": new_balance, "id": account_no},
         )
         return {"account_no": account_no, "name": name, "new_balance": new_balance}
+
+
+def transfer_account(transfer: Transfer, config: DatabaseConfig | None = None) -> dict[str, Any]:
+    """Transfer funds from one account to another."""
+    with get_cursor(config) as cur:
+        # Withdraw from source account
+        cur.execute(
+            "SELECT name, balance FROM accounts WHERE account_no = :id",
+            {"id": transfer.from_account_no},
+        )
+        from_row = cur.fetchone()
+        if not from_row:
+            raise AccountNotFoundError(transfer.from_account_no)
+        from_name, from_balance = from_row
+        if transfer.amount > from_balance:
+            raise InsufficientFundsError(transfer.from_account_no, from_balance, transfer.amount)
+
+        # Check destination account
+        cur.execute(
+            "SELECT name, balance FROM accounts WHERE account_no = :id",
+            {"id": transfer.to_account_no},
+        )
+        to_row = cur.fetchone()
+        if not to_row:
+            raise AccountNotFoundError(transfer.to_account_no)
+        to_name, to_balance = to_row
+
+        # Perform transfer
+        new_from_balance = from_balance - transfer.amount
+        new_to_balance = to_balance + transfer.amount
+
+        cur.execute(
+            "UPDATE accounts SET balance = :balance WHERE account_no = :id",
+            {"balance": new_from_balance, "id": transfer.from_account_no},
+        )
+        cur.execute(
+            "UPDATE accounts SET balance = :balance WHERE account_no = :id",
+            {"balance": new_to_balance, "id": transfer.to_account_no},
+        )
+
+        return {
+            "from_account_no": transfer.from_account_no,
+            "to_account_no": transfer.to_account_no,
+            "transfered_amount": transfer.amount,
+            "from_new_balance": new_from_balance,
+            "to_new_balance": new_to_balance,
+        }

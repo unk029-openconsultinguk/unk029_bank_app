@@ -8,16 +8,21 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from unk029.database import create_account, get_account, topup_account, withdraw_account
+from unk029.database import (
+    create_account,
+    get_account,
+    topup_account,
+    transfer_account,
+    withdraw_account,
+)
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
-from unk029.models import AccountCreate, TopUp, WithDraw
+from unk029.models import AccountCreate, TopUp, Transfer, WithDraw
 
 app = FastAPI(
     title="UNK029 Bank API",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
-    root_path="/bank",
 )
 
 
@@ -30,9 +35,17 @@ class ChatResponse(BaseModel):
 
 
 # ============== API Endpoints ==============
+@app.get("/account/transfer")
+def transfer_account_endpoint(transfer: Transfer) -> dict[str, Any]:
+    try:
+        return transfer_account(transfer)
+    except AccountNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except InsufficientFundsError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
-@app.get("/account/{account_no}")
+@app.get("/account/{account_no}", include_in_schema=False)
 def get_account_endpoint(account_no: int) -> dict[str, Any]:
     try:
         return get_account(account_no)
@@ -40,12 +53,12 @@ def get_account_endpoint(account_no: int) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
-@app.post("/account")
+@app.post("/account", include_in_schema=False)
 def create_account_endpoint(account: AccountCreate) -> dict[str, Any]:
     return create_account(account)
 
 
-@app.patch("/account/{account_no}/topup")
+@app.patch("/account/{account_no}/topup", include_in_schema=False)
 def topup_account_endpoint(account_no: int, topup: TopUp) -> dict[str, Any]:
     try:
         return topup_account(account_no, topup)
@@ -53,7 +66,7 @@ def topup_account_endpoint(account_no: int, topup: TopUp) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
-@app.patch("/account/{account_no}/withdraw")
+@app.patch("/account/{account_no}/withdraw", include_in_schema=False)
 def withdraw_account_endpoint(account_no: int, withdraw: WithDraw) -> dict[str, Any]:
     try:
         return withdraw_account(account_no, withdraw)

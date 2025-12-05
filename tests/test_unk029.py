@@ -46,10 +46,11 @@ def test_withdraw_model() -> None:
 
 def test_account_model() -> None:
     """Test Account model creation."""
-    account = Account(account_no=123, name="John Doe", balance=500.0)
+    account = Account(account_no=123, name="John Doe", balance=500.0, sortcode="12-34-56")
     assert account.account_no == 123
     assert account.name == "John Doe"
     assert account.balance == 500.0
+    assert account.sortcode == "12-34-56"
 
 
 def test_database_config_defaults() -> None:
