@@ -58,7 +58,7 @@ COPY src ./src
 
 # Install dependencies and application in editable mode (source files available at runtime)
 RUN UV_EXTRA_INDEX_URL="https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}/simple/" \
-    uv sync --locked --no-default-groups
+    uv sync --no-default-groups
 
 ## Final Image
 # The image used in the final image MUST match exactly to the python_builder image.

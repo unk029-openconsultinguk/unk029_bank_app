@@ -4,7 +4,7 @@ Exposes banking tools via FastMCP for AI agents to discover and call.
 
 Architecture:
 - FastMCP exposes tools via HTTP
-- AI Agent discovers and calls these tools
+- Simple chat client processes user queries directly
 - Tools interact with Bank API
 """
 
@@ -12,10 +12,13 @@ import logging
 import os
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastmcp import FastMCP
 import httpx
 from pydantic import BaseModel
+
+# Import the Gemini banking client
+from bank_app.simple_client import GeminiBankingClient
 
 # Setup
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +29,9 @@ mcp = FastMCP("Bank MCP")
 
 # Bank API URL
 BANK_API = os.getenv("BANK_API_URL", "http://unk029_bank_app:8001")
+
+# Initialize Gemini client for chat
+simple_client = GeminiBankingClient(mcp_server_url="http://localhost:8002")
 
 # BANKING DATA
 BANKING_INFO = {
@@ -131,24 +137,20 @@ class ChatRequest(BaseModel):
 
 
 @app.post("/chat")
-async def chat(request: ChatRequest) -> dict[str, str]:
+async def chat(request: ChatRequest, http_request: Request) -> dict[str, str]:
     """
-    Chat endpoint - forwards to AI Agent which calls MCP tools
+    Chat endpoint - Process banking queries with simple client
+    Maintains session context per client IP
     """
     try:
-        logger.info(f"User: {request.message}")
+        # Get client identifier (IP address or default)
+        client_id = http_request.client.host if http_request.client else "default"
+        logger.info(f"User [{client_id}]: {request.message}")
         
-        # Forward to AI agent
-        async with httpx.AsyncClient(timeout=30.0) as http_client:
-            response = await http_client.post(
-                "http://unk029_ai_agent:8003/chat",
-                json={"message": request.message}
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return {"reply": "AI agent unavailable"}
+        # Process with simple client (maintains session per client)
+        reply = simple_client.process_query(request.message, client_id=client_id)
+        
+        return {"reply": reply}
                 
     except Exception as e:
         logger.error(f"Error: {e}")

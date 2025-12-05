@@ -47,78 +47,82 @@ def _get_session_key(request: Request | None) -> str:
 
 def call_mcp_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
     """
-    Call MCP Server tools via MCP HTTP protocol.
-    Agent communicates with MCP Server to execute banking operations.
+    Call bank API directly to execute banking operations.
     """
     try:
         if not tool_input:
             return {"error": "Invalid tool input"}
 
         with httpx.Client(timeout=10.0) as http_client:
-            mcp_url = "http://unk029_mcp_server:8002/mcp"
+            bank_api_url = "http://unk029_bank_app:8001"
 
-            print(f"DEBUG: Calling MCP tool {tool_name} with input: {tool_input}", flush=True)
+            print(f"DEBUG: Calling tool {tool_name} with input: {tool_input}", flush=True)
 
-            # Call MCP tools using the tool names defined in MCP server
+            # Call bank API directly
             if tool_name == "get_account_info":
-                # Map to MCP tool: check_balance
                 account_no = int(tool_input.get("account_no", 0))
-                mcp_request = {
-                    "account_no": account_no
-                }
-                # Try the direct MCP endpoint
-                print(f"DEBUG: MCP request URL: {mcp_url}/tools/check_balance", flush=True)
-                print(f"DEBUG: MCP request body: {mcp_request}", flush=True)
-                response = http_client.post(
-                    f"{mcp_url}/tools/check_balance",
-                    json=mcp_request
+                print(f"DEBUG: Fetching account {account_no}", flush=True)
+                response = http_client.get(
+                    f"{bank_api_url}/account/{account_no}"
                 )
-                print(f"DEBUG: MCP response status: {response.status_code}", flush=True)
-                print(f"DEBUG: MCP response body: {response.text[:500]}", flush=True)
+                print(f"DEBUG: Response status: {response.status_code}", flush=True)
                 if response.status_code == 200:
-                    return response.json()
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "account_no": data.get("account_no"),
+                        "name": data.get("name"),
+                        "balance": data.get("balance")
+                    }
                 else:
-                    return {"error": f"Account not found"}
+                    return {"success": False, "error": f"Account {account_no} not found"}
 
             elif tool_name == "deposit_funds":
-                # Map to MCP tool: deposit_money
-                response = http_client.post(
-                    f"{mcp_url}/call",
-                    json={
-                        "tool": "deposit_money",
-                        "arguments": {
-                            "account_no": int(tool_input.get("account_no", 0)),
-                            "amount": float(tool_input.get("amount", 0))
-                        }
-                    }
+                account_no = int(tool_input.get("account_no", 0))
+                amount = float(tool_input.get("amount", 0))
+                print(f"DEBUG: Depositing £{amount} to account {account_no}", flush=True)
+                response = http_client.patch(
+                    f"{bank_api_url}/account/{account_no}/topup",
+                    json={"amount": amount}
                 )
+                print(f"DEBUG: Response status: {response.status_code}", flush=True)
                 if response.status_code == 200:
-                    return response.json()
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "account_no": data.get("account_no"),
+                        "name": data.get("name"),
+                        "new_balance": data.get("new_balance")
+                    }
                 else:
-                    return {"error": "Deposit failed"}
+                    return {"success": False, "error": "Deposit failed"}
 
             elif tool_name == "withdraw_funds":
-                # Map to MCP tool: withdraw_money
-                response = http_client.post(
-                    f"{mcp_url}/call",
-                    json={
-                        "tool": "withdraw_money",
-                        "arguments": {
-                            "account_no": int(tool_input.get("account_no", 0)),
-                            "amount": float(tool_input.get("amount", 0))
-                        }
-                    }
+                account_no = int(tool_input.get("account_no", 0))
+                amount = float(tool_input.get("amount", 0))
+                print(f"DEBUG: Withdrawing £{amount} from account {account_no}", flush=True)
+                response = http_client.patch(
+                    f"{bank_api_url}/account/{account_no}/withdraw",
+                    json={"amount": amount}
                 )
+                print(f"DEBUG: Response status: {response.status_code}", flush=True)
                 if response.status_code == 200:
-                    return response.json()
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "account_no": data.get("account_no"),
+                        "name": data.get("name"),
+                        "new_balance": data.get("new_balance")
+                    }
                 else:
-                    return {"error": "Withdrawal failed"}
+                    error_msg = response.text
+                    return {"success": False, "error": error_msg if error_msg else "Withdrawal failed"}
             else:
-                return {"error": f"Unknown tool: {tool_name}"}
+                return {"success": False, "error": f"Unknown tool: {tool_name}"}
 
     except Exception as e:
         print(f"Tool execution error: {e}", flush=True)
-        return {"error": f"Failed to call tool: {e!s}"}
+        return {"success": False, "error": f"Failed to call tool: {e!s}"}
 
 
 # Define tools for Google ADK

@@ -1,4 +1,4 @@
---index-url https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}/simple/
+--index-url https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}simple/
 --extra-index-url https://pypi.org/simple
 
 unk029>=0.1.2
