@@ -85,6 +85,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 path = "src/unk029/__about__.py"
+validate-bump = false
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/unk029"]
