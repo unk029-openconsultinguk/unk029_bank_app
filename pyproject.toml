@@ -1,5 +1,5 @@
 [project]
-name = "unk029-bank-app"
+name = "unk029"
 # version = "1.0.0"
 dynamic = ["version"]
 description = "UNK029 Banking Library - Reusable banking operations with Oracle database support"
