@@ -22,14 +22,14 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "unk029>=0.1.2",
+    "unk029>=0.0.1",
     "oracledb>=2.0.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.20.0",
     "fastmcp>=0.1.0",
-    "google-genai>=0.1.0",
+    "google-generativeai>=0.8.0",
     "httpx>=0.25.0",
     "rich",
 ]
@@ -79,16 +79,16 @@ licenses = [
     "pip-licenses-cli",
 ]
 
-# Commented out - using unk029 package from Nexus repository instead of building locally
-#[build-system]
-#requires = ["hatchling"]
-#build-backend = "hatchling.build"
 
-#[tool.hatch.version]
-#path = "src/unk029/__about__.py"
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-#[tool.hatch.build.targets.wheel]
-#packages = ["src/unk029"]
+[tool.hatch.version]
+path = "src/unk029/__about__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/unk029"]
 
 #[tool.poetry]
 #name = "unk029"
