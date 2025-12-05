@@ -4,6 +4,7 @@ Leverages Gemini 2.0 Flash to understand natural language and call MCP banking t
 """
 
 import os
+from typing import Any
 
 from dotenv import load_dotenv
 import google.generativeai as genai
@@ -16,7 +17,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_API_KEY environment variable not set")
 
-genai.configure(api_key=GOOGLE_API_KEY)
+genai.configure(api_key=GOOGLE_API_KEY)  # type: ignore[attr-defined]
 
 
 class GeminiBankingClient:
@@ -24,10 +25,10 @@ class GeminiBankingClient:
 
     def __init__(self, mcp_server_url: str = "http://mcp_server:8002"):
         self.mcp_url = mcp_server_url
-        self.sessions = {}  # Store conversation history by client ID
+        self.sessions: dict[str, list[str]] = {}  # Store conversation history
         self.tools = self._define_tools()
 
-    def _define_tools(self) -> list:
+    def _define_tools(self) -> list[dict[str, Any]]:
         """Define banking tools for Gemini to use."""
         return [
             {
@@ -112,11 +113,11 @@ class GeminiBankingClient:
 
             # Call Gemini without tools - let it respond in plain text
             # We'll parse the response text for tool calls manually if needed
-            response = genai.GenerativeModel(
+            response = genai.GenerativeModel(  # type: ignore[attr-defined]
                 model_name="gemini-2.0-flash",
             ).generate_content(
                 contents=messages,
-                generation_config=genai.GenerationConfig(temperature=0.3),
+                generation_config=genai.GenerationConfig(temperature=0.3),  # type: ignore[attr-defined]
             )
 
             # Handle response
@@ -142,7 +143,7 @@ class GeminiBankingClient:
         except Exception as e:
             return f"❌ Error processing request: {e!s}"
 
-    def _execute_mcp_tool(self, tool_name: str, args: dict) -> dict:
+    def _execute_mcp_tool(self, tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Execute an MCP tool and return the result."""
         try:
             result = self._call_mcp_tool(tool_name, **args)
@@ -150,7 +151,7 @@ class GeminiBankingClient:
         except Exception as e:
             return {"error": f"Tool execution failed: {e!s}"}
 
-    def _call_mcp_tool(self, tool_name: str, **kwargs) -> dict:
+    def _call_mcp_tool(self, tool_name: str, **kwargs: Any) -> dict[str, Any]:
         """Call an MCP tool via the /mcp endpoint using JSON-RPC."""
         try:
             with httpx.Client(timeout=10.0) as client:
@@ -168,8 +169,8 @@ class GeminiBankingClient:
                     result = response.json()
                     # Extract result from JSON-RPC response
                     if "result" in result:
-                        return result["result"]
-                    return result
+                        return result["result"]  # type: ignore[no-any-return]
+                    return result  # type: ignore[no-any-return]
                 else:
                     return {"error": f"API error {response.status_code}: {response.text}"}
         except Exception as e:
