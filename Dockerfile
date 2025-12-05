@@ -52,11 +52,9 @@ COPY pyproject.toml uv.lock ./
 COPY requirements-nexus.txt ./
 
 # Copy in only bank_app source (unk029 comes from Nexus as a package)
-# COPY src/bank_app ./src/bank_app
+COPY src/bank_app ./src/bank_app
 
-COPY src ./src
-
-# Install dependencies and application in editable mode (source files available at runtime)
+# Install dependencies from Nexus and only bank_app locally
 RUN UV_EXTRA_INDEX_URL="https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}/simple/" \
     uv sync --no-default-groups
 

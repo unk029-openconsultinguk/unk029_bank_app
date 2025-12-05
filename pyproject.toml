@@ -1,13 +1,11 @@
 [project]
 name = "unk029"
-# version = "1.0.0"
 dynamic = ["version"]
 description = "UNK029 Banking Library - Reusable banking operations with Oracle database support"
 authors = [
     { name = "UNK029 Team", email = "unk029@openconsultinguk.com" }]
 license = "MIT"
 license-files = ["LICENSE*"]
-readme = "README.md"
 keywords = ["banking", "oracle", "database", "accounts", "financial"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -89,6 +87,13 @@ validate-bump = false
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/unk029"]
+
+#[tool.hatch.version]
+#path = "src/unk029/__about__.py"
+
+
+#[tool.hatch.build.targets.wheel]
+#packages = ["src/unk029"]
 
 #[tool.poetry]
 #name = "unk029"
