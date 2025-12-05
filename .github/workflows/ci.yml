@@ -54,32 +54,15 @@ jobs:
           restore-keys: uv-
 
       - name: Install dependencies
-        env:
-          UV_INDEX_USERNAME: ${{ vars.OC_USERNAME }}
-          UV_INDEX_PASSWORD: ${{ secrets.OC_PASSWORD }}
         run: uv sync
 
-      - name: Debug Nexus Auth
-        run: |
-          echo "Username: ${{ vars.OC_USERNAME }}"
-          echo "Publish URL: ${{ vars.OC_PUBLISH_URL }}"
-          echo "Python version: ${{ env.PYTHON_VERSION }}"
       - name: Run lint
-        env:
-          UV_INDEX_USERNAME: ${{ vars.OC_USERNAME }}
-          UV_INDEX_PASSWORD: ${{ secrets.OC_PASSWORD }}
         run: uv run nox -s lint
 
       - name: Run type check
-        env:
-          UV_INDEX_USERNAME: ${{ vars.OC_USERNAME }}
-          UV_INDEX_PASSWORD: ${{ secrets.OC_PASSWORD }}
         run: uv run nox -s type_check
 
       - name: Run tests
-        env:
-          UV_INDEX_USERNAME: ${{ vars.OC_USERNAME }}
-          UV_INDEX_PASSWORD: ${{ secrets.OC_PASSWORD }}
         run: uv run nox -s test-${{ env.PYTHON_VERSION }}
 
   # -----------------------
@@ -161,7 +144,6 @@ jobs:
           version: ${{ env.UV_VERSION }}
 
       - name: Install dependencies
-        env:
         run: uv sync
 
       - name: Install Hatch
@@ -177,17 +159,20 @@ jobs:
         id: versioning
         run: |
           pkg_name="${{ steps.pkgname.outputs.package_name }}"
-          current_version=$(hatch version)
-          major_minor=$(echo "$current_version" | awk -F. '{print $1"."$2}')
-          patch=$(echo "$current_version" | awk -F. '{print $3}' | sed 's/[^0-9].*$//')
-          
+          major_minor=$(hatch version | awk -F. '{print $1"."$2}')
+          uv pip install --upgrade pip
+          latest_dev=$(pip index versions $pkg_name --index-url "${OC_PYPI}" \
+                        | grep -Eo "[0-9]+\.[0-9]+\.[0-9]+\.dev[0-9]+" \
+                        | sort -V \
+                        | tail -n1 || echo "${major_minor}.0.dev0")
+          IFS='.' read -ra parts <<< "$latest_dev"
+          patch=${parts[2]}
+          next_patch=$((patch + 1))
           # Get PR SHA in shell
           full_sha="${{ github.event.pull_request.head.sha }}"
           short_hash="${full_sha:0:7}"
-          
-          # Create dev version based on current version
-          dev_version="${major_minor}.${patch}.dev${GITHUB_RUN_NUMBER}+g${short_hash}"
-          echo "Next dev version: $dev_version (current was $current_version)"
+          dev_version="${major_minor}.${next_patch}.dev${GITHUB_RUN_NUMBER}+g${short_hash}"
+          echo "Next dev version: $dev_version (latest dev was $latest_dev)"
           echo "version=$dev_version" >> $GITHUB_OUTPUT
 
       - name: Bump version
