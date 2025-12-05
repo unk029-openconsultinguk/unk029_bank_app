@@ -161,7 +161,6 @@ jobs:
           version: ${{ env.UV_VERSION }}
 
       - name: Install dependencies
-        env:
         run: uv sync
 
       - name: Install Hatch
