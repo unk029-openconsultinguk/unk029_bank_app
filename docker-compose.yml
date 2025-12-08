@@ -47,8 +47,10 @@ services:
         PYPI_PASSWORD: ${PYPI_PASSWORD}
     container_name: unk029_ai_agent
     environment:
-      SERVICE: ai_agent
+      SERVICE: adk_web
       PORT: 8003
+      MCP_SERVER_URL: http://unk029_mcp_server:8002/mcp/sse
+      GOOGLE_GENAI_USE_VERTEXAI: "False"
     env_file:
       - .env
     expose:

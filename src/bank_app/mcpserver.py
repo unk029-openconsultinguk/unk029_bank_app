@@ -18,7 +18,7 @@ BANK_API = os.getenv("BANK_API_URL", "http://unk029_bank_app:8001")
 
 
 @mcp.tool()
-def bank_action(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+def UNK029_bank(action: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Perform banking actions via the FastAPI backend.
 
     Actions:
@@ -71,7 +71,8 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-app.mount("/mcp", mcp.http_app())
+# Mount MCP with SSE support for ADK connection
+app.mount("/mcp", mcp.sse_app())
 
 
 if __name__ == "__main__":

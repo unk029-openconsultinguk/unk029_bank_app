@@ -1,14 +1,14 @@
 [project]
-name = "unk029"
-dynamic = ["version"]
-description = "UNK029 Banking Library - Reusable banking operations with Oracle database support"
+name = "unk029-bank-app"
+version = "1.0.0"
+description = "UNK029 Banking Application - FastAPI backend with MCP server and ADK agent"
 authors = [
     { name = "UNK029 Team", email = "unk029@openconsultinguk.com" }]
 license = "MIT"
 license-files = ["LICENSE*"]
-keywords = ["banking", "oracle", "database", "accounts", "financial"]
+keywords = ["banking", "fastapi", "mcp", "agent", "adk"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
@@ -16,17 +16,16 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Typing :: Typed",
     "Topic :: Office/Business :: Financial",
-    "Topic :: Database",
 ]
 requires-python = ">=3.10,<3.13"
 dependencies = [
-    "oracledb>=2.0.0",
+    "unk029>=0.1.3",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.20.0",
     "fastmcp>=0.1.0",
-    "google-generativeai>=0.8.0",
+    "google-adk[web]>=0.5.0",
     "httpx>=0.25.0",
     "rich",
 ]
@@ -81,23 +80,8 @@ licenses = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.hatch.version]
-path = "src/unk029/__about__.py"
-validate-bump = false
-
 [tool.hatch.build.targets.wheel]
-packages = ["src/unk029"]
-
-#[tool.hatch.version]
-#path = "src/unk029/__about__.py"
-
-
-#[tool.hatch.build.targets.wheel]
-#packages = ["src/unk029"]
-
-#[tool.poetry]
-#name = "unk029"
-#version = "0.1.0"
+packages = ["src/bank_app"]
 
 
 # For non-src directory projects, explicitly set top level model name:
@@ -192,5 +176,7 @@ exclude_also = [
 [[tool.uv.index]]
 name = "nexus"
 url = "https://nexus.openconsultinguk.com/repository/sandbox/simple/"
-explicit = true
+
+[tool.uv.sources]
+unk029 = { index = "nexus" }
 
