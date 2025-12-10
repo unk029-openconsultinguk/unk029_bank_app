@@ -67,3 +67,8 @@ ALWAYS CALL THE TOOL FOR ANY BANKING OPERATION:
 Remember: The account number comes from the frontend context. Use it for all operations.""",
     tools=[mcp_toolset],
 )
+
+
+if __name__ == "__main__":
+    # This file makes bank_agent discoverable by ADK web
+    pass

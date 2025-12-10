@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (accountNumber: string, password: string) => {
     try {
       // Call FastAPI backend to authenticate
-      const response = await fetch('/account/' + accountNumber, {
+      const response = await fetch('/api/account/' + accountNumber, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

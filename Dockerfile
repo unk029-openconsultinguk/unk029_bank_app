@@ -105,7 +105,7 @@ ENV SERVICE=fastapi
 CMD ["sh", "-c", "case \"$SERVICE\" in \
   mcp_server) uvicorn bank_app.mcpserver:app --host 0.0.0.0 --port 8002 ;; \
   fastapi) uvicorn bank_app.api:app --host 0.0.0.0 --port 8001 ;; \
-  dev_ui) adk web --host 0.0.0.0 --port 8003 src/bank_app/bank_agent ;; \
+  dev_ui) adk web --host 0.0.0.0 --port 8003 --url_prefix /dev-ui src/bank_app ;; \
   *) echo \"Unknown service: $SERVICE\" && exit 1 ;; \
 esac"]
 

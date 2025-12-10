@@ -107,7 +107,7 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
         account_no: accountNumber,
         sort_code: sortCode
       });
-      const response = await fetch(`/account/validate?${params}`, {
+      const response = await fetch(`/api/account/validate?${params}`, {
         method: 'POST'
       });
       
@@ -166,7 +166,7 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
         return;
       }
 
-      const response = await fetch('/account/transfer', {
+      const response = await fetch('/api/account/transfer', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
