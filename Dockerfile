@@ -104,8 +104,6 @@ RUN chown -R user:user ${HOME}
 ENV SERVICE=fastapi
 CMD ["sh", "-c", "case \"$SERVICE\" in \
   mcp_server) uvicorn bank_app.mcpserver:app --host 0.0.0.0 --port 8002 ;; \
-  ai_agent) uvicorn bank_app.agent:app --host 0.0.0.0 --port 8003 ;; \
-  adk_web) adk web --host 0.0.0.0 --port 8003 ${APP_HOME}/src/bank_app ;; \
   fastapi) uvicorn bank_app.api:app --host 0.0.0.0 --port 8001 ;; \
   *) echo \"Unknown service: $SERVICE\" && exit 1 ;; \
 esac"]

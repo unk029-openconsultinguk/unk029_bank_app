@@ -1,363 +1,42 @@
-/* Modern App Layout */
-.app {
-  width: 100%;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #f5f7fa;
-}
-
-/* Full Page Views */
-.full-page-view {
-  width: 100%;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #f5f7fa;
-}
-
-/* Professional Top Header */
-.top-header {
-  background: white;
-  padding: 0 32px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 72px;
-  border-bottom: 1px solid #e5e7eb;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
 }
 
 .logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
 }
 
-.logo-icon {
-  width: 44px;
-  height: 44px;
-  background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
-.logo-icon svg {
-  width: 24px;
-  height: 24px;
-}
-
-.logo-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.logo-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: #1a1a2e;
-  letter-spacing: -0.5px;
-}
-
-.logo-tagline {
-  font-size: 11px;
-  color: #6b7280;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* Main Navigation */
-.main-nav {
-  display: flex;
-  gap: 8px;
-}
-
-.nav-link {
-  padding: 10px 20px;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #4b5563;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.nav-link:hover {
-  background: #f3f4f6;
-  color: #1a1a2e;
-}
-
-.nav-link.active {
-  background: #0066cc;
-  color: white;
-}
-
-/* Header Right Section */
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.ai-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
-}
-
-.ai-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.4);
-}
-
-.ai-icon {
-  font-size: 16px;
-}
-
-.user-menu {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background: #f9fafb;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-}
-
-.user-avatar {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.user-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.user-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1a1a2e;
-}
-
-.user-role {
-  font-size: 11px;
-  color: #6b7280;
-}
-
-.logout-icon-btn {
-  width: 36px;
-  height: 36px;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #6b7280;
-  transition: all 0.2s ease;
-}
-
-.logout-icon-btn:hover {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.logout-icon-btn svg {
-  width: 20px;
-  height: 20px;
-}
-
-.main-content {
-  flex: 1;
-  overflow-y: auto;
-}
-
-/* Legacy styles for backward compatibility */
-.view-header {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-  padding: 0 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.3);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  height: 70px;
-}
-
-.view-header h2 {
-  color: white;
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0;
-}
-
-.back-btn,
-.logout-btn {
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-}
-
-.back-btn {
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.back-btn:hover {
-  background: white;
-  color: #3b82f6;
-  border-color: white;
-  transform: translateX(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.logout-btn {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-  border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
-.logout-btn:hover {
-  background: #dc2626;
-  color: white;
-  border-color: #dc2626;
-}
-
-/* Responsive */
-@media (max-width: 1024px) {
-  .top-header {
-    padding: 0 16px;
-  }
-  
-  .logo-text {
-    display: none;
-  }
-  
-  .user-info {
-    display: none;
-  }
-  
-  .nav-link {
-    padding: 10px 14px;
-  }
-}
-
-@media (max-width: 768px) {
-  .main-nav {
-    display: none;
-  }
-  
-  .ai-btn span:last-child {
-    display: none;
-  }
-}
-
-/* Loading States */
-@keyframes shimmer {
-  0% { background-position: -1000px 0; }
-  100% { background-position: 1000px 0; }
-}
-
-.skeleton {
-  animation: shimmer 2s infinite linear;
-  background: linear-gradient(
-    to right,
-    #f0f0f0 4%,
-    #e0e0e0 25%,
-    #f0f0f0 36%
-  );
-  background-size: 1000px 100%;
-}
-
-/* Fade In Animation */
-@keyframes fadeIn {
+@keyframes logo-spin {
   from {
-    opacity: 0;
-    transform: translateY(10px);
+    transform: rotate(0deg);
   }
   to {
-    opacity: 1;
-    transform: translateY(0);
+    transform: rotate(360deg);
   }
 }
 
-.fade-in {
-  animation: fadeIn 0.3s ease-out;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .view-header {
-    padding: 1rem;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-  }
-  
-  .view-header h2 {
-    font-size: 1.25rem;
-  }
-  
-  .back-btn,
-  .logout-btn {
-    padding: 0.5rem 1rem;
-    font-size: 0.8125rem;
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
   }
 }
 
-@media (max-width: 480px) {
-  .view-header {
-    padding: 0.75rem;
-  }
-  
-  .view-header h2 {
-    width: 100%;
-    text-align: center;
-    order: -1;
-  }
-  
-  .back-btn,
-  .logout-btn {
-    flex: 1;
-  }
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
 }

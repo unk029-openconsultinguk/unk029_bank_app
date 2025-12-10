@@ -38,27 +38,6 @@ services:
       - app
     restart: unless-stopped
 
-  ai_agent:
-    build:
-      context: .
-      args:
-        PYPI_HOST: ${PYPI_HOST}
-        PYPI_USER: ${PYPI_USER}
-        PYPI_PASSWORD: ${PYPI_PASSWORD}
-    container_name: unk029_ai_agent
-    environment:
-      SERVICE: adk_web
-      PORT: 8003
-      MCP_SERVER_URL: http://unk029_mcp_server:8002/mcp/sse
-      GOOGLE_GENAI_USE_VERTEXAI: "False"
-    env_file:
-      - .env
-    expose:
-      - "8003"
-    depends_on:
-      - mcp_server
-    restart: unless-stopped
-
   nginx:
     build: ./frontend
     container_name: unk029_nginx
@@ -72,5 +51,4 @@ services:
     depends_on:
       - app
       - mcp_server
-      - ai_agent
     restart: unless-stopped
