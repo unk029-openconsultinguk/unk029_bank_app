@@ -38,6 +38,26 @@ services:
       - app
     restart: unless-stopped
 
+  dev_ui:
+    build:
+      context: .
+      args:
+        PYPI_HOST: ${PYPI_HOST}
+        PYPI_USER: ${PYPI_USER}
+        PYPI_PASSWORD: ${PYPI_PASSWORD}
+    container_name: unk029_dev_ui
+    environment:
+      SERVICE: dev_ui
+      PORT: 8003
+    env_file:
+      - .env
+    expose:
+      - "8003"
+    depends_on:
+      - app
+      - mcp_server
+    restart: unless-stopped
+
   nginx:
     build: ./frontend
     container_name: unk029_nginx

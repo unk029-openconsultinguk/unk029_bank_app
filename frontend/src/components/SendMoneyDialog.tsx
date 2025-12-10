@@ -20,12 +20,14 @@ const EXCHANGE_RATES: Record<string, number> = {
   JPY: 188.50,
 };
 
-// Helper function to convert technical errors to user-friendly messages
 const getErrorMessage = (errorResponse: any): string => {
   const detail = errorResponse?.detail || '';
   
   if (detail.includes('not found') || detail.includes('does not exist')) {
     return 'The recipient account does not exist. Please check the sort code and account number.';
+  }
+  if (detail.includes('does not match')) {
+    return detail;
   }
   if (detail.includes('Insufficient funds') || detail.includes('insufficient')) {
     return 'You do not have sufficient funds for this transfer.';
@@ -33,11 +35,7 @@ const getErrorMessage = (errorResponse: any): string => {
   if (detail.includes('Invalid') || detail.includes('invalid')) {
     return 'Invalid account details. Please check the sort code and account number format.';
   }
-  if (detail.includes('same account')) {
-    return 'You cannot transfer to the same account.';
-  }
   
-  // Fallback message
   return 'Transfer failed. Please check your details and try again.';
 };
 
@@ -50,11 +48,18 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
   const [currency, setCurrency] = useState('GBP');
   const [reference, setReference] = useState('');
   const [error, setError] = useState('');
-  const [validating, setValidating] = useState(false);
+  const [sortCodeError, setSortCodeError] = useState('');
 
   const amountInGBP = parseFloat(amount) / EXCHANGE_RATES[currency] || 0;
 
-  // Validation helper function
+  const formatSortCode = (value: string): string => {
+    const digits = value.replace(/\D/g, '').slice(0, 6);
+    if (digits.length === 0) return '';
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return digits.slice(0, 2) + '-' + digits.slice(2);
+    return digits.slice(0, 2) + '-' + digits.slice(2, 4) + '-' + digits.slice(4, 6);
+  };
+
   const validateForm = async (): Promise<string | null> => {
     // Recipient Name validation
     if (!recipient.trim()) {
@@ -67,7 +72,7 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
       return 'Recipient name should only contain letters, spaces, hyphens, and apostrophes.';
     }
 
-    // Sort Code validation (6 digits without formatting)
+    // Sort Code validation
     const cleanSortCode = sortCode.replace(/\D/g, '');
     if (!cleanSortCode) {
       return 'Sort code is required.';
@@ -76,7 +81,7 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
       return 'Enter valid sort code (e.g., 20-00-00). Requires exactly 6 digits.';
     }
 
-    // Account Number validation (8-10 digits)
+    // Account Number validation
     if (!accountNumber.trim()) {
       return 'Account number is required.';
     }
@@ -96,17 +101,51 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
       return `Insufficient funds. You have £${currentBalance.toFixed(2)} available.`;
     }
 
-    // Validate that the recipient account exists
+    // Validate sort code matches the account in database
     try {
-      const response = await fetch(`/account/${accountNumber}`);
+      const params = new URLSearchParams({
+        account_no: accountNumber,
+        sort_code: sortCode
+      });
+      const response = await fetch(`/account/validate?${params}`, {
+        method: 'POST'
+      });
+      
       if (!response.ok) {
-        return `Account number ${accountNumber} does not exist. Please check and try again.`;
+        const errorData = await response.json();
+        return getErrorMessage(errorData);
+      }
+
+      const accountData = await response.json();
+      
+      // Verify recipient name matches
+      const normalizedRecipient = recipient.trim().toLowerCase();
+      const normalizedAccountName = accountData.name.trim().toLowerCase();
+      
+      if (!normalizedAccountName.includes(normalizedRecipient) && !normalizedRecipient.includes(normalizedAccountName.split(' ')[0])) {
+        return `The recipient name "${recipient}" does not match the account name in our records.`;
       }
     } catch (err) {
       return 'Unable to verify account. Please try again.';
     }
 
     return null;
+  };
+
+  const handleSortCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Check if user is trying to enter letters
+    const hasLetters = /[a-zA-Z]/.test(value);
+    if (hasLetters) {
+      setSortCodeError('Sort code can only contain numbers. Letters are not allowed.');
+      setSortCode('');
+      return;
+    }
+    
+    setSortCodeError('');
+    const formatted = formatSortCode(value);
+    setSortCode(formatted);
   };
 
   const handleSubmit = async () => {
@@ -142,7 +181,6 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
       if (response.ok) {
         setError('');
         setStep('success');
-        // Call the parent callback for local state update
         onSend(amountInGBP, recipient, currency);
       } else {
         const errorResponse = await response.json();
@@ -165,6 +203,8 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
     setAmount('');
     setCurrency('GBP');
     setReference('');
+    setError('');
+    setSortCodeError('');
     onClose();
   };
 
@@ -204,23 +244,15 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
                   <Input
                     placeholder="20-00-00"
                     value={sortCode}
-                    onChange={(e) => {
-                      // Extract only digits
-                      const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
-                      
-                      // Auto-format as XX-XX-XX
-                      if (digits.length === 0) {
-                        setSortCode('');
-                      } else if (digits.length <= 2) {
-                        setSortCode(digits);
-                      } else if (digits.length <= 4) {
-                        setSortCode(digits.slice(0, 2) + '-' + digits.slice(2));
-                      } else {
-                        setSortCode(digits.slice(0, 2) + '-' + digits.slice(2, 4) + '-' + digits.slice(4, 6));
-                      }
-                    }}
+                    onChange={handleSortCodeChange}
                     maxLength={8}
                   />
+                  {sortCodeError && (
+                    <p className="text-xs text-red-600">{sortCodeError}</p>
+                  )}
+                  {!sortCodeError && sortCode && (
+                    <p className="text-xs text-green-600">✓ Format valid</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Account Number</Label>

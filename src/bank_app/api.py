@@ -5,9 +5,6 @@ Handles account management and banking operations.
 
 from typing import Any
 import httpx
-import os
-import asyncio
-import json
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -20,7 +17,17 @@ from unk029.database import (
 )
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
 from unk029.models import AccountCreate, TopUp, Transfer, WithDraw
-from bank_app.bank_agent import root_agent
+from bank_app.bank_agent.agent import root_agent
+
+
+class ChatRequest(BaseModel):
+    message: str
+    account_no: int | None = None
+
+
+class ChatResponse(BaseModel):
+    response: str
+    account_no: int | None = None
 
 app = FastAPI(
     title="UNK029 Bank API",
@@ -28,16 +35,6 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
 )
-
-
-class ChatRequest(BaseModel):
-    message: str
-    account_number: str = None
-    use_tools: bool = False
-
-
-class ChatResponse(BaseModel):
-    reply: str
 
 
 # ============== API Endpoints ==============
@@ -55,6 +52,33 @@ def transfer_account_endpoint(transfer: Transfer) -> dict[str, Any]:
 def get_account_endpoint(account_no: int) -> dict[str, Any]:
     try:
         return get_account(account_no)
+    except AccountNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@app.post("/account/validate", include_in_schema=False)
+def validate_account_endpoint(account_no: int, sort_code: str) -> dict[str, Any]:
+    """Validate that sort code matches the account number"""
+    try:
+        account = get_account(account_no)
+        
+        # Normalize sort codes for comparison (remove dashes)
+        provided_sort_code = sort_code.replace('-', '')
+        db_sort_code = account.get('sortcode', '').replace('-', '')
+        
+        # Check if sort codes match
+        if provided_sort_code != db_sort_code:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Sort code does not match this account. Expected: {account.get('sortcode')}"
+            )
+        
+        return {
+            "valid": True,
+            "account_no": account["account_no"],
+            "name": account["name"],
+            "sortcode": account["sortcode"]
+        }
     except AccountNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
@@ -82,80 +106,73 @@ def withdraw_account_endpoint(account_no: int, withdraw: WithDraw) -> dict[str, 
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
-def _extract_text_from_chunk(chunk: Any) -> str:
-    """Extract text from various chunk types returned by the agent."""
-    if chunk is None:
-        return ""
-    
-    # If it's already a string, return it
-    if isinstance(chunk, str):
-        return chunk
-    
-    # Try to get text attribute
-    if hasattr(chunk, 'text') and isinstance(chunk.text, str):
-        return chunk.text
-    
-    # Try to get content attribute
-    if hasattr(chunk, 'content') and isinstance(chunk.content, str):
-        return chunk.content
-    
-    # Try to convert to string
-    try:
-        chunk_str = str(chunk).strip()
-        # Filter out noise like '<' or empty strings
-        if chunk_str and chunk_str not in ['<', '', 'None']:
-            return chunk_str
-    except:
-        pass
-    
-    return ""
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"message": "FastAPI is running"}
 
 
-# Chat endpoint - call AI agent directly
-@app.post("/api/chat", response_model=ChatResponse, include_in_schema=False)
+@app.get("/")
+def root() -> dict[str, Any]:
+    return {
+        "message": "UNK029 Bank API is running",
+        "version": "1.0",
+        "architecture": {
+            "web_ui": "React Frontend → FastAPI → Oracle DB",
+            "ai_chat": "Frontend Chat → Google ADK Agent → MCP Server → FastAPI → Oracle DB"
+        },
+        "endpoints": {
+            "health": "/health",
+            "docs": "/docs",
+            "chat": "/api/chat",
+            "account": "/api/account/{account_no}",
+            "dev_ui": "/dev-ui/"
+        }
+    }
+
+
+@app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest) -> ChatResponse:
-    """Process chat requests with the AI agent"""
+    """Chat with the AI banking assistant powered by Google ADK Agent and MCP Tools"""
     try:
+        import asyncio
+        from google.adk.agents import InvocationContext
+        
+        # Add account context to the message if available
+        context_message = request.message
+        if request.account_no:
+            context_message = f"[Account: {request.account_no}] {request.message}"
+        
+        # Create invocation context with user message
+        context = InvocationContext(
+            session_id="web_session",
+            user_content=context_message
+        )
+        
+        # Call the Google ADK Agent using run_async
         response_text = ""
+        async for event in root_agent.run_async(parent_context=context):
+            # Collect text from response events
+            if hasattr(event, 'text') and event.text:
+                response_text += event.text
+            elif hasattr(event, 'content') and event.content:
+                response_text += str(event.content)
         
-        try:
-            # Collect all chunks from the async generator
-            chunks = []
-            async for chunk in root_agent.run_live(request.message):
-                chunks.append(chunk)
-            
-            # Process collected chunks to build response
-            for chunk in chunks:
-                text = _extract_text_from_chunk(chunk)
-                if text:
-                    response_text += text
-                    
-        except AttributeError as attr_error:
-            # Handle model_copy and other attribute errors gracefully
-            error_msg = str(attr_error)
-            print(f"Agent attribute error: {error_msg}")
-            # Don't fail silently - still try to return useful response
-            if not response_text:
-                response_text = "I processed your request but encountered a technical issue. The operation may have been completed. Please check your account."
-                
-        except Exception as inner_error:
-            # If anything else fails
-            print(f"Async iteration error: {str(inner_error)}")
-            print(f"Error type: {type(inner_error).__name__}")
-            if not response_text:
-                response_text = f"I encountered an issue processing your request: {str(inner_error)}"
+        if not response_text:
+            response_text = "I processed your request but didn't generate a response."
         
-        # Ensure we have a response
-        if not response_text or response_text.isspace():
-            response_text = "I received your message but could not process it properly. Please try again."
-        
-        return ChatResponse(reply=response_text.strip())
-        
+        return ChatResponse(
+            response=response_text.strip(),
+            account_no=request.account_no
+        )
     except Exception as e:
-        print(f"Chat endpoint error: {str(e)}")
+        # Log the error and return to user
         import traceback
-        traceback.print_exc()
-        return ChatResponse(reply=f"I apologize, I encountered an error: {str(e)}")
+        print(f"Chat error: {str(e)}")
+        print(traceback.format_exc())
+        return ChatResponse(
+            response=f"❌ Sorry, I encountered an error. Please try again.",
+            account_no=request.account_no
+        )
 
 
 if __name__ == "__main__":

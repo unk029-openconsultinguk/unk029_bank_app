@@ -13,7 +13,6 @@ import PayBillDialog from '@/components/PayBillDialog';
 import NewPayeeDialog from '@/components/NewPayeeDialog';
 import AccountsDialog from '@/components/AccountsDialog';
 import SettingsDialog from '@/components/SettingsDialog';
-import { toast } from '@/hooks/use-toast';
 
 interface Transaction {
   id: string;
@@ -28,7 +27,9 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [accountNumber, setAccountNumber] = useState<number | null>(null);
 
   // Dialog states
   const [chatOpen, setChatOpen] = useState(false);
@@ -49,7 +50,9 @@ const Dashboard = () => {
           return;
         }
 
-        const response = await fetch(`/account/${accountNumber}`);
+        setAccountNumber(parseInt(accountNumber));
+
+        const response = await fetch(`/api/account/${accountNumber}`);
         if (!response.ok) {
           throw new Error('Failed to fetch account data');
         }
@@ -58,24 +61,47 @@ const Dashboard = () => {
         setBalance(accountData.balance || 0);
       } catch (error) {
         console.error('Error fetching account data:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load account data',
-          variant: 'destructive',
-        });
+        setError('Failed to load account data. Please login again.');
+        logout();
       } finally {
         setLoading(false);
       }
     };
 
     fetchAccountData();
-  }, [navigate]);
+  }, [navigate, logout]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-semibold mb-4">Loading your account...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Session Expired</h2>
+            <p className="text-gray-600 mb-6">{error}</p>
+          </div>
+          <button
+            onClick={() => {
+              navigate('/login');
+            }}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors"
+          >
+            Return to Login
+          </button>
         </div>
       </div>
     );
@@ -221,8 +247,7 @@ const Dashboard = () => {
       <AIChatPanel 
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
-        balance={balance}
-        transactions={transactions}
+        accountNo={accountNumber}
       />
 
       {/* Header Dialogs */}
