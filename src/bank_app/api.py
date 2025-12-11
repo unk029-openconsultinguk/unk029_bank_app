@@ -18,22 +18,10 @@ from unk029.database import (
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
 from unk029.models import AccountCreate, TopUp, Transfer, WithDraw
 
-from bank_app.bank_agent.agent import root_agent
-
 
 class LoginRequest(BaseModel):
     account_no: int
     password: str
-
-
-class ChatRequest(BaseModel):
-    message: str
-    account_no: int | None = None
-
-
-class ChatResponse(BaseModel):
-    response: str
-    account_no: int | None = None
 
 
 app = FastAPI(
@@ -155,45 +143,6 @@ def health() -> dict[str, str]:
 @app.get("/")
 def root() -> dict[str, str]:
     return {"service": "UNK Bank API", "status": "running", "version": "1.0"}
-
-
-@app.post("/api/chat")
-async def chat_endpoint(request: ChatRequest) -> ChatResponse:
-    """Chat with the AI banking assistant powered by Google ADK Agent and MCP Tools"""
-    try:
-        from google.adk.agents import InvocationContext
-
-        # Add account context to the message if available
-        context_message = request.message
-        if request.account_no:
-            context_message = f"[Account: {request.account_no}] {request.message}"
-
-        # Create invocation context with user message
-        context = InvocationContext(user_content=context_message)  # type: ignore
-
-        # Call the Google ADK Agent using run_async
-        response_text = ""
-        async for event in root_agent.run_async(context):
-            # Collect text from response events
-            if hasattr(event, "text") and event.text:
-                response_text += event.text
-            elif hasattr(event, "content") and event.content:
-                response_text += str(event.content)
-
-        if not response_text:
-            response_text = "I processed your request but didn't generate a response."
-
-        return ChatResponse(response=response_text.strip(), account_no=request.account_no)
-    except Exception as e:
-        # Log the error and return to user
-        import traceback
-
-        print(f"Chat error: {e!s}")
-        print(traceback.format_exc())
-        return ChatResponse(
-            response="❌ Sorry, I encountered an error. Please try again.",
-            account_no=request.account_no,
-        )
 
 
 if __name__ == "__main__":
