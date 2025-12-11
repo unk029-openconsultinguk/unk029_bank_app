@@ -6,7 +6,6 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastmcp import FastMCP
-
 import httpx
 
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +18,7 @@ BANK_API = os.getenv("BANK_API_URL", "http://unk029_bank_app:8001")
 
 
 @mcp.tool()
-def UNK029_Bank(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+def unk029_bank(action: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Perform banking actions via the FastAPI backend.
 
     Actions:
@@ -63,7 +62,7 @@ def UNK029_Bank(action: str, payload: dict[str, Any]) -> dict[str, Any]:
             response = client.request(method, url, **kwargs)
 
         logger.info(f"Response status: {response.status_code}")
-        
+
         if response.status_code >= 400:
             logger.error(f"API error: {response.text}")
             return {"error": response.text, "status": response.status_code}

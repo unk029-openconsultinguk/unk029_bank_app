@@ -9,7 +9,6 @@ from typing import Any
 
 from dotenv import load_dotenv
 import oracledb
-
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
 from unk029.models import AccountCreate, TopUp, Transfer, WithDraw
 
@@ -61,7 +60,10 @@ def get_account(account_no: int, config: DatabaseConfig | None = None) -> dict[s
     """Get account details by account number."""
     with get_cursor(config) as cur:
         cur.execute(
-            "SELECT account_no, name, balance, sortcode, password, email FROM accounts WHERE account_no = :id",
+            (
+                "SELECT account_no, name, balance, sortcode, password, email "
+                "FROM accounts WHERE account_no = :id"
+            ),
             {"id": account_no},
         )
         row = cur.fetchone()
@@ -95,7 +97,7 @@ def create_account(account: AccountCreate, config: DatabaseConfig | None = None)
                 "balance": account.balance,
                 "password": account.password,
                 "sortcode": account.sortcode,
-                "email": getattr(account, 'email', None),
+                "email": getattr(account, "email", None),
             },
         )
         return {
@@ -104,7 +106,7 @@ def create_account(account: AccountCreate, config: DatabaseConfig | None = None)
             "balance": account.balance,
             "sortcode": account.sortcode,
             "password": account.password,
-            "email": getattr(account, 'email', None),
+            "email": getattr(account, "email", None),
         }
 
 

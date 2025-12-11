@@ -4,20 +4,20 @@ Handles account management and banking operations.
 """
 
 from typing import Any
-import httpx
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-
 from unk029.database import (
     create_account,
     get_account,
+    get_connection,
     topup_account,
     transfer_account,
     withdraw_account,
-    get_connection,
 )
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
 from unk029.models import AccountCreate, TopUp, Transfer, WithDraw
+
 from bank_app.bank_agent.agent import root_agent
 
 
@@ -35,6 +35,7 @@ class ChatResponse(BaseModel):
     response: str
     account_no: int | None = None
 
+
 app = FastAPI(
     title="UNK029 Bank API",
     docs_url="/docs",
@@ -45,6 +46,7 @@ app = FastAPI(
 
 # ============== API Endpoints ==============
 
+
 @app.post("/account/login", include_in_schema=False)
 def login_endpoint(login: LoginRequest) -> dict[str, Any]:
     """Authenticate account with password."""
@@ -52,28 +54,24 @@ def login_endpoint(login: LoginRequest) -> dict[str, Any]:
         # Query database directly for authentication
         conn = get_connection()
         cur = conn.cursor()
-        
+
         cur.execute(
-            "SELECT account_no, name, balance, sortcode, password FROM accounts WHERE account_no = :id",
+            "SELECT account_no, name, balance, sortcode, password, email"
+            " FROM accounts WHERE account_no = :id",
             {"id": login.account_no},
         )
         row = cur.fetchone()
         cur.close()
         conn.close()
-        
+
         if not row:
             raise HTTPException(status_code=404, detail="Account not found")
-        
+
         # Check password (row[4] is password column)
         if row[4] != login.password:
             raise HTTPException(status_code=401, detail="Invalid password")
-        
-        return {
-            "account_no": row[0],
-            "name": row[1],
-            "balance": row[2],
-            "sortcode": row[3]
-        }
+
+        return {"account_no": row[0], "name": row[1], "balance": row[2], "sortcode": row[3]}
     except HTTPException:
         raise
     except Exception as e:
@@ -81,7 +79,7 @@ def login_endpoint(login: LoginRequest) -> dict[str, Any]:
 
 
 @app.post("/account/transfer")
-def transfer_account_endpoint(transfer: Transfer) -> dict[str, Any]:
+def transfer_account_endpoint(transfer: Transfer) -> Any:
     try:
         return transfer_account(transfer)
     except AccountNotFoundError as e:
@@ -91,7 +89,7 @@ def transfer_account_endpoint(transfer: Transfer) -> dict[str, Any]:
 
 
 @app.get("/account/{account_no}", include_in_schema=False)
-def get_account_endpoint(account_no: int) -> dict[str, Any]:
+def get_account_endpoint(account_no: int) -> Any:
     try:
         return get_account(account_no)
     except AccountNotFoundError as e:
@@ -103,35 +101,36 @@ def validate_account_endpoint(account_no: int, sort_code: str) -> dict[str, Any]
     """Validate that sort code matches the account number"""
     try:
         account = get_account(account_no)
-        
+
         # Normalize sort codes for comparison (remove dashes)
-        provided_sort_code = sort_code.replace('-', '')
-        db_sort_code = account.get('sortcode', '').replace('-', '')
-        
+        provided_sort_code = sort_code.replace("-", "")
+        db_sort_code = account.get("sortcode", "").replace("-", "")
+
         # Check if sort codes match
         if provided_sort_code != db_sort_code:
+            expected = account.get("sortcode")
             raise HTTPException(
-                status_code=400, 
-                detail=f"Sort code does not match this account. Expected: {account.get('sortcode')}"
+                status_code=400,
+                detail=f"Sort code does not match this account. Expected: {expected}",
             )
-        
+
         return {
             "valid": True,
             "account_no": account["account_no"],
             "name": account["name"],
-            "sortcode": account["sortcode"]
+            "sortcode": account["sortcode"],
         }
     except AccountNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @app.post("/account", include_in_schema=False)
-def create_account_endpoint(account: AccountCreate) -> dict[str, Any]:
+def create_account_endpoint(account: AccountCreate) -> Any:
     return create_account(account)
 
 
 @app.patch("/account/{account_no}/topup", include_in_schema=False)
-def topup_account_endpoint(account_no: int, topup: TopUp) -> dict[str, Any]:
+def topup_account_endpoint(account_no: int, topup: TopUp) -> Any:
     try:
         return topup_account(account_no, topup)
     except AccountNotFoundError as e:
@@ -139,7 +138,7 @@ def topup_account_endpoint(account_no: int, topup: TopUp) -> dict[str, Any]:
 
 
 @app.patch("/account/{account_no}/withdraw", include_in_schema=False)
-def withdraw_account_endpoint(account_no: int, withdraw: WithDraw) -> dict[str, Any]:
+def withdraw_account_endpoint(account_no: int, withdraw: WithDraw) -> Any:
     try:
         return withdraw_account(account_no, withdraw)
     except AccountNotFoundError as e:
@@ -162,44 +161,38 @@ def root() -> dict[str, str]:
 async def chat_endpoint(request: ChatRequest) -> ChatResponse:
     """Chat with the AI banking assistant powered by Google ADK Agent and MCP Tools"""
     try:
-        import asyncio
         from google.adk.agents import InvocationContext
-        
+
         # Add account context to the message if available
         context_message = request.message
         if request.account_no:
             context_message = f"[Account: {request.account_no}] {request.message}"
-        
+
         # Create invocation context with user message
-        context = InvocationContext(
-            session_id="web_session",
-            user_content=context_message
-        )
-        
+        context = InvocationContext(user_content=context_message)  # type: ignore
+
         # Call the Google ADK Agent using run_async
         response_text = ""
-        async for event in root_agent.run_async(parent_context=context):
+        async for event in root_agent.run_async(context):
             # Collect text from response events
-            if hasattr(event, 'text') and event.text:
+            if hasattr(event, "text") and event.text:
                 response_text += event.text
-            elif hasattr(event, 'content') and event.content:
+            elif hasattr(event, "content") and event.content:
                 response_text += str(event.content)
-        
+
         if not response_text:
             response_text = "I processed your request but didn't generate a response."
-        
-        return ChatResponse(
-            response=response_text.strip(),
-            account_no=request.account_no
-        )
+
+        return ChatResponse(response=response_text.strip(), account_no=request.account_no)
     except Exception as e:
         # Log the error and return to user
         import traceback
-        print(f"Chat error: {str(e)}")
+
+        print(f"Chat error: {e!s}")
         print(traceback.format_exc())
         return ChatResponse(
-            response=f"❌ Sorry, I encountered an error. Please try again.",
-            account_no=request.account_no
+            response="❌ Sorry, I encountered an error. Please try again.",
+            account_no=request.account_no,
         )
 
 
