@@ -1,10 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle2, Send, ArrowRight, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Send, ArrowRight, AlertCircle, Building2 } from 'lucide-react';
+
+interface Bank {
+  code: string;
+  name: string;
+  url: string | null;
+  isInternal: boolean;
+  transferMethod: string;
+}
 
 interface SendMoneyDialogProps {
   isOpen: boolean;
@@ -49,8 +57,31 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
   const [reference, setReference] = useState('');
   const [error, setError] = useState('');
   const [sortCodeError, setSortCodeError] = useState('');
+  const [selectedBank, setSelectedBank] = useState('unk029');
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch available banks on mount
+  useEffect(() => {
+    const fetchBanks = async () => {
+      try {
+        const response = await fetch('/api/banks');
+        if (response.ok) {
+          const data = await response.json();
+          setBanks(data); // API returns array directly
+        }
+      } catch (err) {
+        console.error('Failed to fetch banks:', err);
+        // Fallback to internal bank only
+        setBanks([{ code: 'unk029', name: 'UNK Bank (Internal)', url: '/api', isInternal: true, transferMethod: 'internal' }]);
+      }
+    };
+    fetchBanks();
+  }, []);
 
   const amountInGBP = parseFloat(amount) / EXCHANGE_RATES[currency] || 0;
+  const isInternalTransfer = selectedBank === 'unk029';
+  const selectedBankInfo = banks.find(b => b.code === selectedBank);
 
   const formatSortCode = (value: string): string => {
     const digits = value.replace(/\D/g, '').slice(0, 6);
@@ -101,7 +132,12 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
       return `Insufficient funds. You have £${currentBalance.toFixed(2)} available.`;
     }
 
-    // Validate sort code matches the account in database
+    // For cross-bank transfers, skip local validation - let the external bank handle it
+    if (!isInternalTransfer) {
+      return null;
+    }
+
+    // Validate with internal bank API
     try {
       const params = new URLSearchParams({
         account_no: accountNumber,
@@ -159,39 +195,73 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
   };
 
   const handleConfirm = async () => {
+    setLoading(true);
     try {
       const fromAccount = localStorage.getItem('account_number');
       if (!fromAccount || !accountNumber) {
         setError('Account information is missing. Please try again.');
+        setLoading(false);
         return;
       }
 
-      const response = await fetch('/api/account/transfer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from_account_no: parseInt(fromAccount),
-          to_account_no: parseInt(accountNumber),
-          amount: amountInGBP,
-        }),
-      });
+      if (isInternalTransfer) {
+        // Internal transfer within UNK029 bank
+        const response = await fetch('/api/account/transfer', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from_account_no: parseInt(fromAccount),
+            to_account_no: parseInt(accountNumber),
+            amount: amountInGBP,
+          }),
+        });
 
-      if (response.ok) {
-        setError('');
-        setStep('success');
-        onSend(amountInGBP, recipient, currency);
+        if (response.ok) {
+          setError('');
+          setStep('success');
+          onSend(amountInGBP, recipient, currency);
+        } else {
+          const errorResponse = await response.json();
+          const userFriendlyError = getErrorMessage(errorResponse);
+          setError(userFriendlyError);
+          setStep('form');
+        }
       } else {
-        const errorResponse = await response.json();
-        const userFriendlyError = getErrorMessage(errorResponse);
-        setError(userFriendlyError);
-        setStep('form');
+        // Cross-bank transfer - use the cross-bank transfer endpoint
+        const response = await fetch('/api/account/cross-bank-transfer', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from_account_no: parseInt(fromAccount),
+            to_bank_code: selectedBank,
+            to_account_no: parseInt(accountNumber),
+            to_sort_code: sortCode.replace(/-/g, ''),
+            to_name: recipient,
+            amount: amountInGBP,
+          }),
+        });
+
+        if (response.ok) {
+          setError('');
+          setStep('success');
+          onSend(amountInGBP, recipient, currency);
+        } else {
+          const errorResponse = await response.json();
+          const userFriendlyError = getErrorMessage(errorResponse);
+          setError(userFriendlyError);
+          setStep('form');
+        }
       }
     } catch (error) {
       console.error('Transfer error:', error);
       setError('Unable to process transfer. Please check your connection and try again.');
       setStep('form');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -205,6 +275,7 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
     setReference('');
     setError('');
     setSortCodeError('');
+    setSelectedBank('unk029');
     onClose();
   };
 
@@ -229,6 +300,29 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
               </div>
             )}
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4" />
+                  Destination Bank
+                </Label>
+                <Select value={selectedBank} onValueChange={setSelectedBank}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select bank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {banks.map((bank) => (
+                      <SelectItem key={bank.code} value={bank.code}>
+                        {bank.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!isInternalTransfer && (
+                  <p className="text-xs text-amber-600">
+                    ⚠️ Cross-bank transfer - additional processing may apply
+                  </p>
+                )}
+              </div>
               <div className="space-y-2">
                 <Label>Recipient Name</Label>
                 <Input
@@ -325,6 +419,12 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="bg-muted rounded-lg p-4 space-y-3">
+                {!isInternalTransfer && (
+                  <div className="flex justify-between items-center border-b pb-2 mb-2">
+                    <span className="text-muted-foreground">Bank</span>
+                    <span className="font-medium text-amber-600">{selectedBankInfo?.name}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">To</span>
                   <span className="font-medium">{recipient}</span>
@@ -349,11 +449,11 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
                 )}
               </div>
               <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setStep('form')} className="flex-1">
+                <Button variant="outline" onClick={() => setStep('form')} className="flex-1" disabled={loading}>
                   Back
                 </Button>
-                <Button onClick={handleConfirm} className="flex-1">
-                  Confirm & Send
+                <Button onClick={handleConfirm} className="flex-1" disabled={loading}>
+                  {loading ? 'Processing...' : 'Confirm & Send'}
                 </Button>
               </div>
             </div>
@@ -369,6 +469,9 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
               <h3 className="text-xl font-semibold">Transfer Complete!</h3>
               <p className="text-muted-foreground mt-1">
                 £{amountInGBP.toFixed(2)} sent to {recipient}
+                {!isInternalTransfer && (
+                  <span className="block text-xs mt-1">via {selectedBankInfo?.name}</span>
+                )}
               </p>
             </div>
             <Button onClick={handleClose} className="w-full">

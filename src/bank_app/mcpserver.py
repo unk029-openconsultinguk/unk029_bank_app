@@ -16,15 +16,18 @@ mcp = FastMCP("Bank MCP")
 
 BANK_API = os.getenv("BANK_API_URL", "http://unk029_bank_app:8001")
 
-# Other banks we can transfer to
+# Other banks we can transfer to (URLs from environment)
+URR034_BANK_URL = os.getenv("URR034_BANK_URL", "")
+UBF041_BANK_URL = os.getenv("UBF041_BANK_URL", "")
+
 OTHER_BANKS = {
     "urr034": {
-        "url": "https://urr034.dev.openconsultinguk.com/api",
+        "url": URR034_BANK_URL,
         "method": "query_params",  # Uses ?from_account_id=X&to_account_id=Y&amount=Z
     },
     "ubf041": {
-        "url": "https://ubf041.dev.openconsultinguk.com/api",
-        "method": "deposit",  # Uses POST /deposit with JSON body
+        "url": UBF041_BANK_URL,
+        "method": "deposit",  # Uses POST /api/deposit with JSON body
     },
 }
 
@@ -143,8 +146,8 @@ def cross_bank_transfer(
                 transfer_resp = client.post(transfer_url, params=params)
                 
             elif bank_config["method"] == "deposit":
-                # UBF041 style: POST /deposit with JSON body
-                transfer_url = f"{other_bank_url}/deposit"
+                # UBF041 style: POST /api/deposit with JSON body
+                transfer_url = f"{other_bank_url}/api/deposit"
                 json_body = {
                     "account_id": int(to_account_no),
                     "amount": amount,

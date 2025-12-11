@@ -200,3 +200,67 @@ def transfer_account(transfer: Transfer, config: DatabaseConfig | None = None) -
             "from_new_balance": new_from_balance,
             "to_new_balance": new_to_balance,
         }
+
+
+def insert_transaction(
+    account_no: int,
+    type: str,
+    amount: float,
+    description: str = None,
+    related_account_no: int = None,
+    direction: str = None,
+    config: DatabaseConfig | None = None
+) -> None:
+    """Insert a transaction record."""
+    with get_cursor(config) as cur:
+        cur.execute(
+            """
+            INSERT INTO transactions (account_no, type, amount, description, related_account_no, direction)
+            VALUES (:account_no, :type, :amount, :description, :related_account_no, :direction)
+            """,
+            {
+                "account_no": account_no,
+                "type": type,
+                "amount": amount,
+                "description": description,
+                "related_account_no": related_account_no,
+                "direction": direction,
+            },
+        )
+
+
+def get_transactions(account_no: int, config: DatabaseConfig | None = None) -> list[dict[str, Any]]:
+    """Fetch all transactions for an account, most recent first."""
+    with get_cursor(config) as cur:
+        cur.execute(
+            """
+            SELECT id, type, amount, description, created_at, related_account_no, direction
+            FROM transactions
+            WHERE account_no = :account_no
+            ORDER BY created_at DESC
+            """,
+            {"account_no": account_no},
+        )
+        columns = [col[0].lower() for col in cur.description]
+        return [dict(zip(columns, row)) for row in cur.fetchall()]
+
+
+def login_account(account_no: int, password: str, config: DatabaseConfig | None = None) -> dict[str, Any]:
+    """Authenticate account with password."""
+    from unk029.exceptions import InvalidPasswordError
+    with get_cursor(config) as cur:
+        cur.execute(
+            "SELECT account_no, name, balance, sortcode, password, email FROM accounts WHERE account_no = :id",
+            {"id": account_no},
+        )
+        row = cur.fetchone()
+        if not row:
+            raise AccountNotFoundError(account_no)
+        if row[4] != password:
+            raise InvalidPasswordError()
+        return {
+            "account_no": row[0],
+            "name": row[1],
+            "balance": row[2],
+            "sortcode": row[3],
+        }

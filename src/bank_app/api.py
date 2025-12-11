@@ -1,8 +1,8 @@
-"""
-FastAPI Server - Core banking API
+"""FastAPI Server - Core banking API
 Handles account management and banking operations.
 """
 
+import os
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -15,8 +15,9 @@ from unk029.database import (
     transfer_account,
     withdraw_account,
 )
-from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
+from unk029.exceptions import AccountNotFoundError, InsufficientFundsError, InvalidPasswordError
 from unk029.models import AccountCreate, TopUp, Transfer, WithDraw
+from unk029_local_package.database import insert_transaction, get_transactions, login_account
 
 
 class LoginRequest(BaseModel):
@@ -38,33 +39,14 @@ app = FastAPI(
 
 @app.post("/account/login", include_in_schema=False)
 def login_endpoint(login: LoginRequest) -> dict[str, Any]:
-    """Authenticate account with password."""
     try:
-        # Query database directly for authentication
-        conn = get_connection()
-        cur = conn.cursor()
-
-        cur.execute(
-            "SELECT account_no, name, balance, sortcode, password, email"
-            " FROM accounts WHERE account_no = :id",
-            {"id": login.account_no},
-        )
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
-
-        if not row:
-            raise HTTPException(status_code=404, detail="Account not found")
-
-        # Check password (row[4] is password column)
-        if row[4] != login.password:
-            raise HTTPException(status_code=401, detail="Invalid password")
-
-        return {"account_no": row[0], "name": row[1], "balance": row[2], "sortcode": row[3]}
-    except HTTPException:
-        raise
+        return login_account(login.account_no, login.password)
+    except AccountNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except InvalidPasswordError as e:
+        raise HTTPException(status_code=401, detail="Invalid password") from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=401, detail=str(e)) from e
 
 
 @app.post("/account/transfer")
@@ -121,7 +103,15 @@ def create_account_endpoint(account: AccountCreate) -> Any:
 @app.patch("/account/{account_no}/topup", include_in_schema=False)
 def topup_account_endpoint(account_no: int, topup: TopUp) -> Any:
     try:
-        return topup_account(account_no, topup)
+        result = topup_account(account_no, topup)
+        insert_transaction(
+            account_no=account_no,
+            type="deposit",
+            amount=topup.amount,
+            description="Top up",
+            direction="in"
+        )
+        return result
     except AccountNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
@@ -129,7 +119,15 @@ def topup_account_endpoint(account_no: int, topup: TopUp) -> Any:
 @app.patch("/account/{account_no}/withdraw", include_in_schema=False)
 def withdraw_account_endpoint(account_no: int, withdraw: WithDraw) -> Any:
     try:
-        return withdraw_account(account_no, withdraw)
+        result = withdraw_account(account_no, withdraw)
+        insert_transaction(
+            account_no=account_no,
+            type="withdraw",
+            amount=withdraw.amount,
+            description="Withdrawal",
+            direction="out"
+        )
+        return result
     except AccountNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except InsufficientFundsError as e:
@@ -141,9 +139,137 @@ def health() -> dict[str, str]:
     return {"message": "FastAPI is running"}
 
 
+# ============== Partner Banks Configuration ==============
+# Bank URLs are loaded from environment variables (set in .env file)
+URR034_BANK_URL = os.getenv("URR034_BANK_URL", "")
+UBF041_BANK_URL = os.getenv("UBF041_BANK_URL", "")
+
+PARTNER_BANKS = [
+    {
+        "code": "unk029",
+        "name": "UNK Bank (Internal)",
+        "url": "/api",
+        "isInternal": True,
+        "transferMethod": "internal",
+    },
+    {
+        "code": "urr034",
+        "name": "Purple Bank",
+        "url": URR034_BANK_URL,
+        "isInternal": False,
+        "transferMethod": "query_params",  # POST /transfer/?from_account_id=X&to_account_id=Y&amount=Z
+    },
+    {
+        "code": "ubf041",
+        "name": "Bartley Bank",
+        "url": UBF041_BANK_URL,
+        "isInternal": False,
+        "transferMethod": "deposit",  # POST /deposit with JSON body
+    },
+]
+
+
+@app.get("/banks")
+def get_partner_banks() -> list[dict[str, Any]]:
+    """Get list of available banks for transfers."""
+    return PARTNER_BANKS
+
+
+class CrossBankTransfer(BaseModel):
+    from_account_no: int
+    to_bank_code: str
+    to_account_no: int
+    to_sort_code: str
+    to_name: str
+    amount: float
+
+
+@app.post("/account/cross-bank-transfer")
+def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
+    """Transfer money to another bank's account."""
+    import requests
+    
+    # Find the target bank
+    target_bank = next((b for b in PARTNER_BANKS if b["code"] == transfer.to_bank_code), None)
+    if not target_bank:
+        raise HTTPException(status_code=400, detail=f"Unknown bank: {transfer.to_bank_code}")
+    
+    if target_bank.get("isInternal"):
+        raise HTTPException(status_code=400, detail="Use internal transfer for same-bank transfers")
+    
+    # First, withdraw from sender's account
+    try:
+        withdraw_account(transfer.from_account_no, WithDraw(amount=transfer.amount))
+    except AccountNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except InsufficientFundsError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    
+    # Then deposit to external bank
+    try:
+        bank_url = target_bank["url"]
+        method = target_bank["transferMethod"]
+        
+        if method == "query_params":
+            # URR034 style: POST /transfer/?from_account_id=X&to_account_id=Y&amount=Z
+            response = requests.post(
+                f"{bank_url}/transfer/",
+                params={
+                    "from_account_id": transfer.from_account_no,
+                    "to_account_id": transfer.to_account_no,
+                    "amount": transfer.amount
+                },
+                timeout=30
+            )
+        elif method == "deposit":
+            # UBF041 style: POST /deposit with JSON body
+            response = requests.post(
+                f"{bank_url}/deposit",
+                json={
+                    "account_number": str(transfer.to_account_no),
+                    "sort_code": transfer.to_sort_code,
+                    "account_holder": transfer.to_name,
+                    "amount": transfer.amount
+                },
+                timeout=30
+            )
+        else:
+            # Refund on unknown method
+            topup_account(transfer.from_account_no, TopUp(amount=transfer.amount))
+            raise HTTPException(status_code=400, detail=f"Unsupported transfer method: {method}")
+        
+        if not response.ok:
+            # Refund on failure
+            topup_account(transfer.from_account_no, TopUp(amount=transfer.amount))
+            error_detail = response.json().get("detail", response.text) if response.text else "External bank error"
+            raise HTTPException(status_code=502, detail=f"External bank rejected transfer: {error_detail}")
+        
+        return {
+            "success": True,
+            "message": f"Successfully transferred £{transfer.amount:.2f} to {target_bank['name']}",
+            "from_account": transfer.from_account_no,
+            "to_bank": transfer.to_bank_code,
+            "to_account": transfer.to_account_no,
+            "amount": transfer.amount
+        }
+        
+    except requests.RequestException as e:
+        # Refund on network error
+        topup_account(transfer.from_account_no, TopUp(amount=transfer.amount))
+        raise HTTPException(status_code=502, detail=f"Failed to connect to external bank: {str(e)}") from e
+
+
 @app.get("/")
 def root() -> dict[str, str]:
     return {"service": "UNK Bank API", "status": "running", "version": "1.0"}
+
+
+@app.get("/account/{account_no}/transactions")
+def get_account_transactions(account_no: int) -> Any:
+    try:
+        return {"transactions": get_transactions(account_no)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

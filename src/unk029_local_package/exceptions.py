@@ -15,6 +15,7 @@ class AccountNotFoundError(AccountError):
         super().__init__(f"Account {account_no} not found")
 
 
+
 class InsufficientFundsError(AccountError):
     """Raised when withdrawal exceeds balance."""
 
@@ -23,3 +24,9 @@ class InsufficientFundsError(AccountError):
         self.balance = balance
         self.amount = amount
         super().__init__(f"Insufficient funds: balance {balance}, requested {amount}")
+
+
+class InvalidPasswordError(AccountError):
+    """Raised when password is invalid during login."""
+    def __init__(self):
+        super().__init__("Invalid password")
