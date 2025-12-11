@@ -48,15 +48,15 @@ ARG PYPI_PASSWORD
 # Copy in project dependency specification.
 COPY pyproject.toml uv.lock ./
 
-# Copy requirements file
+# Copy requirements-nexus.txt
 COPY requirements-nexus.txt ./
 
-# Install dependencies from requirements-nexus.txt with Nexus credentials
-# Credentials come from build args (--build-arg PYPI_USER=... --build-arg PYPI_PASSWORD=...)
-RUN pip install \
-    --index-url "https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}simple/" \
-    --extra-index-url "https://pypi.org/simple/" \
-    -r requirements-nexus.txt
+# Copy in only bank_app source (unk029 comes from Nexus as a package)
+COPY src/bank_app ./src/bank_app
+
+# Install dependencies from Nexus and only bank_app locally
+RUN UV_EXTRA_INDEX_URL="https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}/simple/" \
+    uv sync --no-default-groups
 
 # Copy in only bank_app source (unk029 comes from Nexus as a package)
 COPY src/bank_app ./src/bank_app

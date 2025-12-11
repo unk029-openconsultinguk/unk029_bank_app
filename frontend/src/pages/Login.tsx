@@ -5,8 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { Wallet } from 'lucide-react';
-
 const Login = () => {
   const [accountNumber, setAccountNumber] = useState('');
   const [password, setPassword] = useState('');
@@ -50,8 +48,10 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center">
-            <Wallet className="w-8 h-8 text-primary-foreground" />
+          <div className="mx-auto flex items-center justify-center gap-0">
+            <div className="w-12 h-12 bg-sky-400 rounded-full flex items-center justify-center text-white font-bold text-lg">U</div>
+            <div className="w-12 h-12 bg-sky-600 rounded-full flex items-center justify-center text-white font-bold text-lg" style={{marginLeft: '-12px'}}>N</div>
+            <div className="w-12 h-12 bg-blue-900 rounded-full flex items-center justify-center text-white font-bold text-lg" style={{marginLeft: '-12px'}}>K</div>
           </div>
           <CardTitle className="text-3xl font-bold">Welcome Back</CardTitle>
           <CardDescription className="text-base">
@@ -98,9 +98,9 @@ const Login = () => {
             </Button>
           </form>
           <div className="mt-6 text-center space-y-1">
-            <p className="text-sm font-medium text-foreground">Demo Credentials:</p>
-            <p className="text-sm text-muted-foreground">Account: <span className="font-mono text-foreground">1</span> or <span className="font-mono text-foreground">unk029</span></p>
-            <p className="text-sm text-muted-foreground">Password: <span className="font-mono text-foreground">Bank@2025</span></p>
+            <p className="text-sm font-medium text-foreground">Account details:</p>
+            <p className="text-sm text-muted-foreground">1.Account Number: <span className="font-mono text-foreground">11111111</span> Password: <span className="font-mono text-foreground">Nithya</span></p>
+            <p className="text-sm text-muted-foreground">2.Account Number: <span className="font-mono text-foreground">22222222</span> Password: <span className="font-mono text-foreground">User</span></p>
           </div>
         </CardContent>
       </Card>

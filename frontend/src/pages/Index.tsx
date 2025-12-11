@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Wallet, Shield, Zap, Bot } from 'lucide-react';
+import { Shield, Zap, Bot } from 'lucide-react';
 
 const Index = () => {
   const { user, isLoading } = useAuth();
@@ -20,10 +20,12 @@ const Index = () => {
       <header className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center">
-              <Wallet className="w-6 h-6 text-primary-foreground" />
+            <div className="flex items-center gap-0">
+              <div className="w-10 h-10 bg-sky-400 rounded-full flex items-center justify-center text-white font-bold text-sm">U</div>
+              <div className="w-10 h-10 bg-sky-600 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{marginLeft: '-10px'}}>N</div>
+              <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{marginLeft: '-10px'}}>K</div>
             </div>
-            <h1 className="text-2xl font-bold">MyBank</h1>
+            <h1 className="text-2xl font-bold">UNK Bank</h1>
           </div>
           <Button onClick={() => navigate('/login')} size="lg">
             Sign In

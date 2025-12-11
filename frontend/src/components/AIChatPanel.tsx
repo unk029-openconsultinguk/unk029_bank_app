@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Bot, Send, Mic, MicOff, Volume2, VolumeX, Loader } from 'lucide-react';
+import { createSession, sendMessage } from '@/lib/adk-client';
 
 interface Message {
   id: string;
@@ -30,7 +31,9 @@ const AIChatPanel = ({ isOpen, onClose, accountNo }: AIChatPanelProps) => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [textToSpeechEnabled, setTextToSpeechEnabled] = useState(true);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const userId = accountNo?.toString() || 'guest';
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -90,34 +93,37 @@ const AIChatPanel = ({ isOpen, onClose, accountNo }: AIChatPanelProps) => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const userInput = input;
     setInput('');
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: input,
-          account_no: accountNo,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response');
+      // Create session if needed
+      let sid = sessionId;
+      if (!sid) {
+        const session = await createSession(userId);
+        sid = session.id;
+        setSessionId(sid);
       }
 
-      const data = await response.json();
+      // Add account context to message if logged in
+      const messageWithContext = accountNo 
+        ? `[Account: ${accountNo}] ${userInput}`
+        : userInput;
+
+      // Send message to ADK → MCP → FastAPI → DB
+      const reply = await sendMessage(userId, sid, messageWithContext);
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.response,
+        content: reply,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      speakText(data.response);
+      speakText(reply);
     } catch (error) {
+      console.error('Chat error:', error);
       const errorMessage: Message = {
         id: (Date.now() + 2).toString(),
         role: 'assistant',
