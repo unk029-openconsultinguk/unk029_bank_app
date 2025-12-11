@@ -55,6 +55,8 @@ jobs:
 
       - name: Install dependencies
         run: uv sync
+        env:
+          UV_INDEX_URL: "https://${{ vars.OC_USERNAME }}:${{ secrets.OC_PASSWORD }}@nexus.openconsultinguk.com/repository/sandbox/simple/"
 
       - name: Run lint
         run: uv run nox -s lint
@@ -87,6 +89,8 @@ jobs:
 
       - name: Install dependencies
         run: uv sync
+        env:
+          UV_INDEX_URL: "https://${{ vars.OC_USERNAME }}:${{ secrets.OC_PASSWORD }}@nexus.openconsultinguk.com/repository/sandbox/simple/"
 
       - name: Install Hatch
         run: pip install hatch==${{ env.HATCH_VERSION }}
@@ -145,6 +149,8 @@ jobs:
 
       - name: Install dependencies
         run: uv sync
+        env:
+          UV_INDEX_URL: "https://${{ vars.OC_USERNAME }}:${{ secrets.OC_PASSWORD }}@nexus.openconsultinguk.com/repository/sandbox/simple/"
 
       - name: Install Hatch
         run: pip install hatch==${{ env.HATCH_VERSION }}
