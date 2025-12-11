@@ -14,10 +14,16 @@ from unk029.database import (
     topup_account,
     transfer_account,
     withdraw_account,
+    get_connection,
 )
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
 from unk029.models import AccountCreate, TopUp, Transfer, WithDraw
 from bank_app.bank_agent.agent import root_agent
+
+
+class LoginRequest(BaseModel):
+    account_no: int
+    password: str
 
 
 class ChatRequest(BaseModel):
@@ -38,6 +44,42 @@ app = FastAPI(
 
 
 # ============== API Endpoints ==============
+
+@app.post("/account/login", include_in_schema=False)
+def login_endpoint(login: LoginRequest) -> dict[str, Any]:
+    """Authenticate account with password."""
+    try:
+        # Query database directly for authentication
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        cur.execute(
+            "SELECT account_no, name, balance, sortcode, password FROM accounts WHERE account_no = :id",
+            {"id": login.account_no},
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Account not found")
+        
+        # Check password (row[4] is password column)
+        if row[4] != login.password:
+            raise HTTPException(status_code=401, detail="Invalid password")
+        
+        return {
+            "account_no": row[0],
+            "name": row[1],
+            "balance": row[2],
+            "sortcode": row[3]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @app.post("/account/transfer")
 def transfer_account_endpoint(transfer: Transfer) -> dict[str, Any]:
     try:
@@ -112,22 +154,8 @@ def health() -> dict[str, str]:
 
 
 @app.get("/")
-def root() -> dict[str, Any]:
-    return {
-        "message": "UNK029 Bank API is running",
-        "version": "1.0",
-        "architecture": {
-            "web_ui": "React Frontend → FastAPI → Oracle DB",
-            "ai_chat": "Frontend Chat → Google ADK Agent → MCP Server → FastAPI → Oracle DB"
-        },
-        "endpoints": {
-            "health": "/health",
-            "docs": "/docs",
-            "chat": "/api/chat",
-            "account": "/api/account/{account_no}",
-            "dev_ui": "/dev-ui/"
-        }
-    }
+def root() -> dict[str, str]:
+    return {"service": "UNK Bank API", "status": "running", "version": "1.0"}
 
 
 @app.post("/api/chat")

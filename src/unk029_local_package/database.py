@@ -61,12 +61,19 @@ def get_account(account_no: int, config: DatabaseConfig | None = None) -> dict[s
     """Get account details by account number."""
     with get_cursor(config) as cur:
         cur.execute(
-            "SELECT account_no, name, balance, sortcode FROM accounts WHERE account_no = :id",
+            "SELECT account_no, name, balance, sortcode, password, email FROM accounts WHERE account_no = :id",
             {"id": account_no},
         )
         row = cur.fetchone()
         if row:
-            return {"account_no": row[0], "name": row[1], "balance": row[2], "sortcode": row[3]}
+            return {
+                "account_no": row[0],
+                "name": row[1],
+                "balance": row[2],
+                "sortcode": row[3],
+                "password": row[4],
+                "email": row[5],
+            }
         raise AccountNotFoundError(account_no)
 
 
@@ -80,14 +87,15 @@ def create_account(account: AccountCreate, config: DatabaseConfig | None = None)
 
         # Insert new account
         cur.execute(
-            "INSERT INTO accounts (account_no, name, balance, password, sortcode) "
-            "VALUES (:id, :name, :balance, :password, :sortcode)",
+            "INSERT INTO accounts (account_no, name, balance, password, sortcode, email) "
+            "VALUES (:id, :name, :balance, :password, :sortcode, :email)",
             {
                 "id": account_no,
                 "name": account.name,
                 "balance": account.balance,
                 "password": account.password,
                 "sortcode": account.sortcode,
+                "email": getattr(account, 'email', None),
             },
         )
         return {
@@ -95,6 +103,8 @@ def create_account(account: AccountCreate, config: DatabaseConfig | None = None)
             "name": account.name,
             "balance": account.balance,
             "sortcode": account.sortcode,
+            "password": account.password,
+            "email": getattr(account, 'email', None),
         }
 
 

@@ -31,16 +31,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (accountNumber: string, password: string) => {
     try {
-      // Call FastAPI backend to authenticate
-      const response = await fetch('/api/account/' + accountNumber, {
-        method: 'GET',
+      // Call FastAPI backend to authenticate with password
+      const response = await fetch('/api/account/login', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          account_no: parseInt(accountNumber),
+          password: password,
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Invalid account number or password');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Invalid account number or password');
       }
 
       const accountData = await response.json();
