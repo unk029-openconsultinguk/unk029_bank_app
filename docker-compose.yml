@@ -49,6 +49,7 @@ services:
     environment:
       SERVICE: dev_ui
       PORT: 8003
+      MCP_SERVER_URL: "http://unk029_mcp_server:8002/mcp"
     env_file:
       - .env
     expose:
