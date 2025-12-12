@@ -6,3 +6,4 @@ fastmcp>=0.3.0
 google-generativeai==0.8.4
 httpx==0.27.2
 oracledb>=2.0.0
+unk029>=0.1.4
