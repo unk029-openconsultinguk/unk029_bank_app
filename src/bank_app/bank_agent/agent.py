@@ -29,7 +29,7 @@ try:
             sse_read_timeout=30.0,
         )
     )
-    
+
     logger.info("MCP toolset initialized successfully")
 except Exception as e:
     logger.warning(f"Failed to initialize MCP toolset: {e}")
@@ -39,32 +39,34 @@ except Exception as e:
 # Create the root agent
 tools = [mcp_toolset] if mcp_toolset else []
 
+
 root_agent = LlmAgent(
     name="bank_assistant",
     model="gemini-2.0-flash",
-    description="A helpful banking assistant that can check account balances, make deposits, withdrawals, transfers within UNK029 bank, and cross-bank transfers to other banks.",
-    instruction="""You are a friendly banking assistant for UNK029 Bank. 
-
-Help users with their banking needs including:
-- Checking balances
-- Deposits (topup)
-- Withdrawals
-- Transfers within UNK029 bank
-- Cross-bank transfers to other banks (supported: urr034, ubf041)
-
-For cross-bank transfers, use the cross_bank_transfer tool with:
-- from_account_no: The user's UNK029 account
-- to_bank: The destination bank code ('urr034' or 'ubf041')
-- to_account_no: The account number at the destination bank
-- amount: The amount to transfer
-
-Be professional and helpful. Always verify amounts with the user before processing transfers.""",
+    description=(
+        "A helpful banking assistant that can check account balances, make deposits, "
+        "withdrawals, transfers within UNK029 bank, and cross-bank transfers to other banks."
+    ),
+    instruction=(
+        "You are a friendly banking assistant for UNK029 Bank.\n\n"
+        "Help users with their banking needs including:\n"
+        "- Checking balances\n"
+        "- Deposits (topup)\n"
+        "- Withdrawals\n"
+        "- Transfers within UNK029 bank\n"
+        "- Cross-bank transfers to other banks (supported: urr034, ubf041)\n\n"
+        "For cross-bank transfers, use the cross_bank_transfer tool with:\n"
+        "- from_account_no: The user's UNK029 account\n"
+        "- to_bank: The destination bank code ('urr034' or 'ubf041')\n"
+        "- to_account_no: The account number at the destination bank\n"
+        "- amount: The amount to transfer.\n\n"
+        "Be professional and helpful. Always verify amounts with the user before "
+        "processing transfers."
+    ),
     tools=tools,
 )
 
 
-
 if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8003)
+    # There is no FastAPI app in this module; this is a placeholder for future CLI/server
+    print("This module does not start a server directly.")

@@ -9,6 +9,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 import oracledb
+
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
 from unk029.models import AccountCreate, TopUp, Transfer, WithDraw
 
@@ -206,19 +207,21 @@ def insert_transaction(
     account_no: int,
     type: str,
     amount: float,
-    description: str = None,
-    related_account_no: int = None,
-    direction: str = None,
-    status: str = None,
-    config: DatabaseConfig | None = None
+    description: str | None = None,
+    related_account_no: int | None = None,
+    direction: str | None = None,
+    status: str | None = None,
+    config: "DatabaseConfig | None" = None,
 ) -> None:
     """Insert a transaction record."""
     with get_cursor(config) as cur:
         cur.execute(
-            """
-            INSERT INTO transactions (account_no, type, amount, description, related_account_no, direction, status)
-            VALUES (:account_no, :type, :amount, :description, :related_account_no, :direction, :status)
-            """,
+            (
+                "INSERT INTO transactions (account_no, type, amount, description, "
+                "related_account_no, direction, status) "
+                "VALUES (:account_no, :type, :amount, :description, "
+                ":related_account_no, :direction, :status)"
+            ),
             {
                 "account_no": account_no,
                 "type": type,
@@ -231,7 +234,9 @@ def insert_transaction(
         )
 
 
-def get_transactions(account_no: int, config: DatabaseConfig | None = None) -> list[dict[str, Any]]:
+def get_transactions(
+    account_no: int, config: DatabaseConfig | None = None
+) -> list[dict[str, Any]]:
     """Fetch all transactions for an account, most recent first."""
     with get_cursor(config) as cur:
         cur.execute(
@@ -243,16 +248,25 @@ def get_transactions(account_no: int, config: DatabaseConfig | None = None) -> l
             """,
             {"from_account": account_no},
         )
-        columns = [col[0].lower() for col in cur.description]
-        return [dict(zip(columns, row)) for row in cur.fetchall()]
+        description = cur.description or []
+        if not description:
+            return []
+        columns = [col[0].lower() for col in description]
+        return [dict(zip(columns, row, strict=False)) for row in cur.fetchall()]
 
 
-def login_account(account_no: int, password: str, config: DatabaseConfig | None = None) -> dict[str, Any]:
+def login_account(
+    account_no: int, password: str, config: DatabaseConfig | None = None
+) -> dict[str, Any]:
     """Authenticate account with password."""
     from unk029_local_package.exceptions import InvalidPasswordError
+
     with get_cursor(config) as cur:
         cur.execute(
-            "SELECT account_no, name, balance, sortcode, password, email FROM accounts WHERE account_no = :id",
+            (
+                "SELECT account_no, name, balance, sortcode, password, email "
+                "FROM accounts WHERE account_no = :id"
+            ),
             {"id": account_no},
         )
         row = cur.fetchone()
