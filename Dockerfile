@@ -55,8 +55,9 @@ COPY requirements-nexus.txt ./
 COPY src/bank_app ./src/bank_app
 
 # Install dependencies from Nexus and only bank_app locally
+# Tell uv not to install the local project to ensure unk029 is pulled from Nexus.
 RUN UV_EXTRA_INDEX_URL="https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}/simple/" \
-    uv sync --no-default-groups
+  uv sync --no-default-groups --no-install-project
 
 # Copy in only bank_app source (unk029 comes from Nexus as a package)
 COPY src/bank_app ./src/bank_app
