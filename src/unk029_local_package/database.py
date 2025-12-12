@@ -247,7 +247,7 @@ def get_transactions(account_no: int, config: DatabaseConfig | None = None) -> l
 
 def login_account(account_no: int, password: str, config: DatabaseConfig | None = None) -> dict[str, Any]:
     """Authenticate account with password."""
-    from unk029.exceptions import InvalidPasswordError
+    from unk029_local_package.exceptions import InvalidPasswordError
     with get_cursor(config) as cur:
         cur.execute(
             "SELECT account_no, name, balance, sortcode, password, email FROM accounts WHERE account_no = :id",

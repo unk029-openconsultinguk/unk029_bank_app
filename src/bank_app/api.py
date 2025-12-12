@@ -15,9 +15,10 @@ from unk029.database import (
     transfer_account,
     withdraw_account,
 )
-from unk029.exceptions import AccountNotFoundError, InsufficientFundsError, InvalidPasswordError
+from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
 from unk029.models import AccountCreate, TopUp, Transfer, WithDraw
 from unk029_local_package.database import insert_transaction, get_transactions, login_account
+from unk029_local_package.exceptions import InvalidPasswordError
 
 
 class LoginRequest(BaseModel):

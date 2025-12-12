@@ -7,8 +7,8 @@ services:
         PYPI_USER: ${PYPI_USER}
         PYPI_PASSWORD: ${PYPI_PASSWORD}
     container_name: unk029_bank_app
-    expose:
-      - "8001"
+    ports:
+      - "8001:8001"
     environment:
       SERVICE: fastapi
       PORT: 8001
