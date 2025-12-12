@@ -8,5 +8,6 @@ def test_database_config_validate_true():
 def test_database_config_validate_false():
     from unk029.database import DatabaseConfig
 
-    cfg = DatabaseConfig(user=None, password=None, dsn=None)
+    # Pass empty strings to avoid picking up environment variables during CI
+    cfg = DatabaseConfig(user="", password="", dsn="")
     assert cfg.validate() is False
