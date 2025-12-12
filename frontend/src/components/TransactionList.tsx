@@ -9,6 +9,10 @@ interface Transaction {
   description: string;
   status?: string;
   related_account_no?: string | number | null;
+  from_account_no?: string | number | null;
+  from_name?: string;
+  to_account_no?: string | number | null;
+  to_name?: string;
 }
 
 interface TransactionListProps {
@@ -51,9 +55,14 @@ const TransactionList = ({ transactions }: TransactionListProps) => {
                     )}
                   </div>
                   <div>
-                    <p className="font-medium">{transaction.description}</p>
+                    <p className="font-medium">
+                      {transaction.from_account_no && transaction.to_account_no
+                        ? `From: ${transaction.from_account_no}${transaction.from_name ? ' (' + transaction.from_name + ')' : ''} → To: ${transaction.to_account_no}${transaction.to_name ? ' (' + transaction.to_name + ')' : ''}`
+                        : transaction.description}
+                    </p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(transaction.date).toLocaleDateString()} | Status: {transaction.status ?? 'n/a'}
+                      {transaction.date ? new Date(transaction.date).toLocaleString() : ''}
+                      {transaction.status ? ` | Status: ${transaction.status}` : ''}
                       {transaction.related_account_no ? ` | Related: ${transaction.related_account_no}` : ''}
                     </p>
                   </div>
@@ -65,8 +74,7 @@ const TransactionList = ({ transactions }: TransactionListProps) => {
                       : 'text-destructive'
                   }`}
                 >
-                  {transaction.type === 'deposit' ? '+' : '-'}£
-                  {transaction.amount.toFixed(2)}
+                  {transaction.type === 'deposit' ? `+${transaction.amount.toFixed(2)}` : `-${transaction.amount.toFixed(2)}`}
                 </p>
               </div>
             ))

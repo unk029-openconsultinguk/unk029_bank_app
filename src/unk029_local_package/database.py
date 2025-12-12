@@ -238,10 +238,10 @@ def get_transactions(account_no: int, config: DatabaseConfig | None = None) -> l
             """
             SELECT id, type, amount, description, created_at, related_account_no, direction
             FROM transactions
-            WHERE account_no = :account_no
+            WHERE from_account = :from_account
             ORDER BY created_at DESC
             """,
-            {"account_no": account_no},
+            {"from_account": account_no},
         )
         columns = [col[0].lower() for col in cur.description]
         return [dict(zip(columns, row)) for row in cur.fetchall()]

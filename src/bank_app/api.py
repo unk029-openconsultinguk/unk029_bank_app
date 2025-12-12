@@ -109,7 +109,7 @@ def topup_account_endpoint(account_no: int, topup: TopUp) -> Any:
             account_no=account_no,
             type="deposit",
             amount=topup.amount,
-            description="Top up",
+            description=f"Deposited £{topup.amount}",
             direction="in"
         )
         return result
@@ -125,7 +125,7 @@ def withdraw_account_endpoint(account_no: int, withdraw: WithDraw) -> Any:
             account_no=account_no,
             type="withdraw",
             amount=withdraw.amount,
-            description="Withdrawal",
+            description=f"Withdrawn £{withdraw.amount}",
             direction="out"
         )
         return result
@@ -206,7 +206,7 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
             account_no=transfer.from_account_no,
             type="withdraw",
             amount=transfer.amount,
-            description="Cross-bank transfer failed: account not found",
+            description=f"Failed: From {transfer.from_account_no} to {transfer.to_account_no} ({transfer.to_name}) at {target_bank['name']}",
             related_account_no=transfer.to_account_no,
             direction="out",
             status="fail"
@@ -217,7 +217,7 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
             account_no=transfer.from_account_no,
             type="withdraw",
             amount=transfer.amount,
-            description="Cross-bank transfer failed: insufficient funds",
+            description=f"Failed: From {transfer.from_account_no} to {transfer.to_account_no} ({transfer.to_name}) at {target_bank['name']}",
             related_account_no=transfer.to_account_no,
             direction="out",
             status="fail"
@@ -273,7 +273,7 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
                 account_no=transfer.from_account_no,
                 type="withdraw",
                 amount=transfer.amount,
-                description=f"Cross-bank transfer failed: {error_detail}",
+                description=f"Failed: From {transfer.from_account_no} to {transfer.to_account_no} ({transfer.to_name}) at {target_bank['name']} - {error_detail}",
                 related_account_no=transfer.to_account_no,
                 direction="out",
                 status="fail"
@@ -285,7 +285,7 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
             account_no=transfer.from_account_no,
             type="withdraw",
             amount=transfer.amount,
-            description=f"Cross-bank transfer to {transfer.to_bank_code}",
+            description=f"From {transfer.from_account_no} to {transfer.to_account_no} ({transfer.to_name}) at {target_bank['name']}",
             related_account_no=transfer.to_account_no,
             direction="out",
             status="success"

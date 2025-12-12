@@ -1,14 +1,16 @@
 [project]
-name = "unk029-bank-app"
-version = "1.0.0"
-description = "UNK029 Banking Application - FastAPI backend with MCP server and ADK agent"
+name = "unk029"
+# version = "1.0.0"
+dynamic = ["version"]
+description = "UNK029 Banking Library - Reusable banking operations with Oracle database support"
 authors = [
     { name = "UNK029 Team", email = "unk029@openconsultinguk.com" }]
 license = "MIT"
 license-files = ["LICENSE*"]
-keywords = ["banking", "fastapi", "mcp", "agent", "adk"]
+readme = "README.md"
+keywords = ["banking", "oracle", "database", "accounts", "financial"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
@@ -16,16 +18,17 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Typing :: Typed",
     "Topic :: Office/Business :: Financial",
+    "Topic :: Database",
 ]
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10"
 dependencies = [
-    "unk029>=0.1.2",
+    "oracledb>=2.0.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.20.0",
     "fastmcp>=0.1.0",
-    "google-adk[web]>=0.5.0",
+    "google-genai>=0.1.0",
     "httpx>=0.25.0",
     "rich",
 ]
@@ -75,13 +78,19 @@ licenses = [
     "pip-licenses-cli",
 ]
 
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+path = "src/unk029/__about__.py"
+
 [tool.hatch.build.targets.wheel]
-packages = ["src/bank_app"]
+packages = ["src/unk029"]
+
+[tool.poetry]
+name = "unk029"
+version = "0.1.0"
 
 
 # For non-src directory projects, explicitly set top level model name:
@@ -93,7 +102,7 @@ packages = ["src/bank_app"]
 default-groups = "all"
 # Non-package applications can uncomment the following line and delete [build-system] section to
 # avoid being built or installed: https://docs.astral.sh/uv/reference/settings/#package
-package = false
+#package = false
 
 [tool.mypy]
 ignore_missing_imports = true
@@ -172,11 +181,3 @@ exclude_also = [
     "raise NotImplementedError",
     "@abstractmethod",
 ]
-
-[[tool.uv.index]]
-name = "nexus"
-url = "https://nexus.openconsultinguk.com/repository/sandbox/simple/"
-
-[tool.uv.sources]
-unk029 = { index = "nexus" }
-

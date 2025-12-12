@@ -132,39 +132,40 @@ const Dashboard = () => {
     navigate('/login');
   };
 
-  const handleDeposit = (amount: number, description: string) => {
-    setBalance(prev => prev + amount);
-    setTransactions(prev => [
-      { 
-        id: Date.now().toString(), 
-        type: 'deposit', 
-        amount, 
-        date: new Date(), 
-        description 
-      },
-      ...prev
-    ]);
+  const fetchTransactions = async (accountNumber: number | null) => {
+    if (!accountNumber) return;
+    const txResp = await fetch(`/api/account/${accountNumber}/transactions`);
+    if (txResp.ok) {
+      const txData = await txResp.json();
+      setTransactions(
+        (txData.transactions || []).map((t: any) => ({
+          id: t.id?.toString() ?? '',
+          type: t.type,
+          amount: t.amount,
+          date: t.created_at,
+          description: t.description,
+          status: t.status,
+          related_account_no: t.related_account_no,
+        }))
+      );
+    }
   };
 
-  const handleWithdraw = (amount: number, description: string) => {
+  const handleDeposit = async (amount: number, description: string) => {
+    setBalance(prev => prev + amount);
+    await fetchTransactions(accountNumber);
+  };
+
+  const handleWithdraw = async (amount: number, description: string) => {
     if (amount > balance) {
       return false;
     }
     setBalance(prev => prev - amount);
-    setTransactions(prev => [
-      { 
-        id: Date.now().toString(), 
-        type: 'withdraw', 
-        amount, 
-        date: new Date(), 
-        description 
-      },
-      ...prev
-    ]);
+    await fetchTransactions(accountNumber);
     return true;
   };
 
-  const handleSendMoney = (amount: number, recipient: string) => {
+  const handleSendMoney = async (amount: number, recipient: string) => {
     if (amount > balance) {
       toast({
         title: "Insufficient Funds",
@@ -174,16 +175,7 @@ const Dashboard = () => {
       return false;
     }
     setBalance(prev => prev - amount);
-    setTransactions(prev => [
-      { 
-        id: Date.now().toString(), 
-        type: 'withdraw', 
-        amount, 
-        date: new Date(), 
-        description: `Transfer to ${recipient}` 
-      },
-      ...prev
-    ]);
+    await fetchTransactions(accountNumber);
     return true;
   };
 
