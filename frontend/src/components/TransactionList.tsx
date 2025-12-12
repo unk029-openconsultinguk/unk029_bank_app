@@ -5,8 +5,10 @@ interface Transaction {
   id: string;
   type: 'deposit' | 'withdraw';
   amount: number;
-  date: Date;
+  date: string;
   description: string;
+  status?: string;
+  related_account_no?: string | number | null;
 }
 
 interface TransactionListProps {
@@ -51,7 +53,8 @@ const TransactionList = ({ transactions }: TransactionListProps) => {
                   <div>
                     <p className="font-medium">{transaction.description}</p>
                     <p className="text-sm text-muted-foreground">
-                      {transaction.date.toLocaleDateString()}
+                      {new Date(transaction.date).toLocaleDateString()} | Status: {transaction.status ?? 'n/a'}
+                      {transaction.related_account_no ? ` | Related: ${transaction.related_account_no}` : ''}
                     </p>
                   </div>
                 </div>
