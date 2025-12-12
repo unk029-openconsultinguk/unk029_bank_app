@@ -1,11 +1,13 @@
 [project]
 name = "unk029"
+# version = "1.0.0"
 dynamic = ["version"]
 description = "UNK029 Banking Library - Reusable banking operations with Oracle database support"
 authors = [
     { name = "UNK029 Team", email = "unk029@openconsultinguk.com" }]
 license = "MIT"
 license-files = ["LICENSE*"]
+readme = "README.md"
 keywords = ["banking", "oracle", "database", "accounts", "financial"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -18,7 +20,7 @@ classifiers = [
     "Topic :: Office/Business :: Financial",
     "Topic :: Database",
 ]
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10"
 dependencies = [
     "oracledb>=2.0.0",
     "pydantic>=2.0.0",
@@ -26,7 +28,7 @@ dependencies = [
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.20.0",
     "fastmcp>=0.1.0",
-    "google-generativeai>=0.8.0",
+    "google-genai>=0.1.0",
     "httpx>=0.25.0",
     "rich",
 ]
@@ -76,28 +78,19 @@ licenses = [
     "pip-licenses-cli",
 ]
 
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
 path = "src/unk029/__about__.py"
-validate-bump = false
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/unk029"]
+packages = ["src/unk029", "codeenigma_runtime"]
 
-#[tool.hatch.version]
-#path = "src/unk029/__about__.py"
-
-
-#[tool.hatch.build.targets.wheel]
-#packages = ["src/unk029"]
-
-#[tool.poetry]
-#name = "unk029"
-#version = "0.1.0"
+[tool.poetry]
+name = "unk029"
+version = "0.0.1"
 
 
 # For non-src directory projects, explicitly set top level model name:
@@ -109,7 +102,7 @@ packages = ["src/unk029"]
 default-groups = "all"
 # Non-package applications can uncomment the following line and delete [build-system] section to
 # avoid being built or installed: https://docs.astral.sh/uv/reference/settings/#package
-package = false
+#package = false
 
 [tool.mypy]
 ignore_missing_imports = true
@@ -188,9 +181,3 @@ exclude_also = [
     "raise NotImplementedError",
     "@abstractmethod",
 ]
-
-[[tool.uv.index]]
-name = "nexus"
-url = "https://nexus.openconsultinguk.com/repository/sandbox/simple/"
-explicit = true
-

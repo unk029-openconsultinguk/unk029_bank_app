@@ -2,3 +2,4 @@
 --extra-index-url https://pypi.org/simple
 
 unk029>=0.1.2
+google-adk

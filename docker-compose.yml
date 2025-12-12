@@ -7,8 +7,8 @@ services:
         PYPI_USER: ${PYPI_USER}
         PYPI_PASSWORD: ${PYPI_PASSWORD}
     container_name: unk029_bank_app
-    expose:
-      - "8001"
+    ports:
+      - "8001:8001"
     environment:
       SERVICE: fastapi
       PORT: 8001
@@ -38,22 +38,24 @@ services:
       - app
     restart: unless-stopped
 
-  ai_agent:
+  dev_ui:
     build:
       context: .
       args:
         PYPI_HOST: ${PYPI_HOST}
         PYPI_USER: ${PYPI_USER}
         PYPI_PASSWORD: ${PYPI_PASSWORD}
-    container_name: unk029_ai_agent
+    container_name: unk029_dev_ui
     environment:
-      SERVICE: ai_agent
+      SERVICE: dev_ui
       PORT: 8003
+      MCP_SERVER_URL: "http://mcp_server:8002/mcp/sse"
     env_file:
       - .env
     expose:
       - "8003"
     depends_on:
+      - app
       - mcp_server
     restart: unless-stopped
 
@@ -70,5 +72,4 @@ services:
     depends_on:
       - app
       - mcp_server
-      - ai_agent
     restart: unless-stopped

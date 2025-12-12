@@ -1,61 +1,51 @@
-import { useState, useEffect } from 'react'
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import './App.css'
-import BankChat from './components/BankChat'
-import AccountManager from './components/AccountManager'
-import Dashboard from './components/Dashboard'
-import LoginForm from './components/LoginForm'
-import Header from './components/Header'
-import { ErrorBoundary } from './components/ErrorBoundary'
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import Index from "./pages/Index";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import NotFound from "./pages/NotFound";
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    const token = localStorage.getItem('auth_token')
-    return !!token
-  })
-  const navigate = useNavigate()
-  const location = useLocation()
+const queryClient = new QueryClient();
 
-  const handleLogin = () => {
-    setIsAuthenticated(true)
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
+  
+  return user ? <>{children}</> : <Navigate to="/login" />;
+};
 
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('username')
-    setIsAuthenticated(false)
-  }
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
+  </QueryClientProvider>
+);
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated && location.pathname !== '/') {
-      navigate('/')
-    }
-  }, [isAuthenticated, location.pathname, navigate])
-
-  if (!isAuthenticated) {
-    return <LoginForm onLogin={handleLogin} />
-  }
-
-  return (
-    <ErrorBoundary>
-      <div className="app">
-        <div className="full-page-view">
-          <Header onLogout={handleLogout} />
-          <main className="main-content">
-            <Routes>
-              <Route path="/" element={<Navigate to="/ai-assistant" replace />} />
-              <Route path="/ai-assistant" element={<BankChat />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/accounts" element={<AccountManager initialTab="manage" />} />
-              <Route path="/accounts/create" element={<AccountManager initialTab="create" />} />
-              <Route path="*" element={<Navigate to="/ai-assistant" replace />} />
-            </Routes>
-          </main>
-        </div>
-      </div>
-    </ErrorBoundary>
-  )
-}
-
-export default App
+export default App;

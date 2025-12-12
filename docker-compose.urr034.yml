@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  urr034_bank_app:
+    image: urr034/bank_app:latest
+    container_name: urr034_bank_app
+    ports:
+      - "9001:8001"
+    environment:
+      - PORT=8001
+    restart: unless-stopped
+    # Add any required environment variables or volumes for urr034 here

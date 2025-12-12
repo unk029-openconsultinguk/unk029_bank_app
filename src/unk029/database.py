@@ -61,12 +61,22 @@ def get_account(account_no: int, config: DatabaseConfig | None = None) -> dict[s
     """Get account details by account number."""
     with get_cursor(config) as cur:
         cur.execute(
-            "SELECT account_no, name, balance, sortcode FROM accounts WHERE account_no = :id",
+            (
+                "SELECT account_no, name, balance, sortcode, password, email "
+                "FROM accounts WHERE account_no = :id"
+            ),
             {"id": account_no},
         )
         row = cur.fetchone()
         if row:
-            return {"account_no": row[0], "name": row[1], "balance": row[2], "sortcode": row[3]}
+            return {
+                "account_no": row[0],
+                "name": row[1],
+                "balance": row[2],
+                "sortcode": row[3],
+                "password": row[4],
+                "email": row[5],
+            }
         raise AccountNotFoundError(account_no)
 
 
@@ -80,14 +90,15 @@ def create_account(account: AccountCreate, config: DatabaseConfig | None = None)
 
         # Insert new account
         cur.execute(
-            "INSERT INTO accounts (account_no, name, balance, password, sortcode) "
-            "VALUES (:id, :name, :balance, :password, :sortcode)",
+            "INSERT INTO accounts (account_no, name, balance, password, sortcode, email) "
+            "VALUES (:id, :name, :balance, :password, :sortcode, :email)",
             {
                 "id": account_no,
                 "name": account.name,
                 "balance": account.balance,
                 "password": account.password,
                 "sortcode": account.sortcode,
+                "email": getattr(account, "email", None),
             },
         )
         return {
@@ -95,6 +106,8 @@ def create_account(account: AccountCreate, config: DatabaseConfig | None = None)
             "name": account.name,
             "balance": account.balance,
             "sortcode": account.sortcode,
+            "password": account.password,
+            "email": getattr(account, "email", None),
         }
 
 
@@ -187,4 +200,83 @@ def transfer_account(transfer: Transfer, config: DatabaseConfig | None = None) -
             "transfered_amount": transfer.amount,
             "from_new_balance": new_from_balance,
             "to_new_balance": new_to_balance,
+        }
+
+
+def insert_transaction(
+    account_no: int,
+    type: str,
+    amount: float,
+    description: str | None = None,
+    related_account_no: int | None = None,
+    direction: str | None = None,
+    status: str | None = None,
+    config: "DatabaseConfig | None" = None,
+) -> None:
+    """Insert a transaction record."""
+    with get_cursor(config) as cur:
+        cur.execute(
+            (
+                "INSERT INTO transactions (account_no, type, amount, description, "
+                "related_account_no, direction, status) "
+                "VALUES (:account_no, :type, :amount, :description, "
+                ":related_account_no, :direction, :status)"
+            ),
+            {
+                "account_no": account_no,
+                "type": type,
+                "amount": amount,
+                "description": description,
+                "related_account_no": related_account_no,
+                "direction": direction,
+                "status": status,
+            },
+        )
+
+
+def get_transactions(
+    account_no: int, config: DatabaseConfig | None = None
+) -> list[dict[str, Any]]:
+    """Fetch all transactions for an account, most recent first."""
+    with get_cursor(config) as cur:
+        cur.execute(
+            """
+            SELECT id, type, amount, description, created_at, related_account_no, direction
+            FROM transactions
+            WHERE from_account = :from_account
+            ORDER BY created_at DESC
+            """,
+            {"from_account": account_no},
+        )
+        description = cur.description or []
+        if not description:
+            return []
+        columns = [col[0].lower() for col in description]
+        return [dict(zip(columns, row, strict=False)) for row in cur.fetchall()]
+
+
+def login_account(
+    account_no: int, password: str, config: DatabaseConfig | None = None
+) -> dict[str, Any]:
+    """Authenticate account with password."""
+    from unk029_local_package.exceptions import InvalidPasswordError
+
+    with get_cursor(config) as cur:
+        cur.execute(
+            (
+                "SELECT account_no, name, balance, sortcode, password, email "
+                "FROM accounts WHERE account_no = :id"
+            ),
+            {"id": account_no},
+        )
+        row = cur.fetchone()
+        if not row:
+            raise AccountNotFoundError(account_no)
+        if row[4] != password:
+            raise InvalidPasswordError()
+        return {
+            "account_no": row[0],
+            "name": row[1],
+            "balance": row[2],
+            "sortcode": row[3],
         }
