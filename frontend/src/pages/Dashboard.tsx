@@ -18,8 +18,10 @@ interface Transaction {
   id: string;
   type: 'deposit' | 'withdraw';
   amount: number;
-  date: Date;
+  date: string;
   description: string;
+  status?: string;
+  related_account_no?: string | number | null;
 }
 
 const Dashboard = () => {
@@ -40,7 +42,7 @@ const Dashboard = () => {
   const [accountsOpen, setAccountsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // Fetch account data on mount
+  // Fetch account data and transactions on mount
   useEffect(() => {
     const fetchAccountData = async () => {
       try {
@@ -52,13 +54,31 @@ const Dashboard = () => {
 
         setAccountNumber(parseInt(accountNumber));
 
+        // Fetch account balance
         const response = await fetch(`/api/account/${accountNumber}`);
         if (!response.ok) {
           throw new Error('Failed to fetch account data');
         }
-
         const accountData = await response.json();
         setBalance(accountData.balance || 0);
+
+        // Fetch transactions
+        const txResp = await fetch(`/api/account/${accountNumber}/transactions`);
+        if (txResp.ok) {
+          const txData = await txResp.json();
+          // Map backend transactions to frontend Transaction type
+          setTransactions(
+            (txData.transactions || []).map((t: any) => ({
+              id: t.id?.toString() ?? '',
+              type: t.type,
+              amount: t.amount,
+              date: t.created_at,
+              description: t.description,
+              status: t.status,
+              related_account_no: t.related_account_no,
+            }))
+          );
+        }
       } catch (error) {
         console.error('Error fetching account data:', error);
         setError('Failed to load account data. Please login again.');

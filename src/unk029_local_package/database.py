@@ -209,14 +209,15 @@ def insert_transaction(
     description: str = None,
     related_account_no: int = None,
     direction: str = None,
+    status: str = None,
     config: DatabaseConfig | None = None
 ) -> None:
     """Insert a transaction record."""
     with get_cursor(config) as cur:
         cur.execute(
             """
-            INSERT INTO transactions (account_no, type, amount, description, related_account_no, direction)
-            VALUES (:account_no, :type, :amount, :description, :related_account_no, :direction)
+            INSERT INTO transactions (account_no, type, amount, description, related_account_no, direction, status)
+            VALUES (:account_no, :type, :amount, :description, :related_account_no, :direction, :status)
             """,
             {
                 "account_no": account_no,
@@ -225,6 +226,7 @@ def insert_transaction(
                 "description": description,
                 "related_account_no": related_account_no,
                 "direction": direction,
+                "status": status,
             },
         )
 

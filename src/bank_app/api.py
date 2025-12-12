@@ -202,21 +202,38 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
     try:
         withdraw_account(transfer.from_account_no, WithDraw(amount=transfer.amount))
     except AccountNotFoundError as e:
+        insert_transaction(
+            account_no=transfer.from_account_no,
+            type="withdraw",
+            amount=transfer.amount,
+            description="Cross-bank transfer failed: account not found",
+            related_account_no=transfer.to_account_no,
+            direction="out",
+            status="fail"
+        )
         raise HTTPException(status_code=404, detail=str(e)) from e
     except InsufficientFundsError as e:
+        insert_transaction(
+            account_no=transfer.from_account_no,
+            type="withdraw",
+            amount=transfer.amount,
+            description="Cross-bank transfer failed: insufficient funds",
+            related_account_no=transfer.to_account_no,
+            direction="out",
+            status="fail"
+        )
         raise HTTPException(status_code=400, detail=str(e)) from e
-    
+
     # Then deposit to external bank
     try:
         bank_url = target_bank["url"]
         method = target_bank["transferMethod"]
-        
+
         if method == "query_params":
-            # URR034 style: POST /transfer/?from_account_id=X&to_account_id=Y&amount=Z
+            # URR034 style: POST /transfer/?to_account_id=Y&amount=Z (omit from_account_id for cross-bank)
             response = requests.post(
                 f"{bank_url}/transfer/",
                 params={
-                    "from_account_id": transfer.from_account_no,
                     "to_account_id": transfer.to_account_no,
                     "amount": transfer.amount
                 },
@@ -237,14 +254,43 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
         else:
             # Refund on unknown method
             topup_account(transfer.from_account_no, TopUp(amount=transfer.amount))
+            insert_transaction(
+                account_no=transfer.from_account_no,
+                type="withdraw",
+                amount=transfer.amount,
+                description=f"Cross-bank transfer failed: unsupported method {method}",
+                related_account_no=transfer.to_account_no,
+                direction="out",
+                status="fail"
+            )
             raise HTTPException(status_code=400, detail=f"Unsupported transfer method: {method}")
-        
+
         if not response.ok:
             # Refund on failure
             topup_account(transfer.from_account_no, TopUp(amount=transfer.amount))
             error_detail = response.json().get("detail", response.text) if response.text else "External bank error"
+            insert_transaction(
+                account_no=transfer.from_account_no,
+                type="withdraw",
+                amount=transfer.amount,
+                description=f"Cross-bank transfer failed: {error_detail}",
+                related_account_no=transfer.to_account_no,
+                direction="out",
+                status="fail"
+            )
             raise HTTPException(status_code=502, detail=f"External bank rejected transfer: {error_detail}")
-        
+
+        # Success
+        insert_transaction(
+            account_no=transfer.from_account_no,
+            type="withdraw",
+            amount=transfer.amount,
+            description=f"Cross-bank transfer to {transfer.to_bank_code}",
+            related_account_no=transfer.to_account_no,
+            direction="out",
+            status="success"
+        )
+
         return {
             "success": True,
             "message": f"Successfully transferred £{transfer.amount:.2f} to {target_bank['name']}",
@@ -253,10 +299,19 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
             "to_account": transfer.to_account_no,
             "amount": transfer.amount
         }
-        
+
     except requests.RequestException as e:
         # Refund on network error
         topup_account(transfer.from_account_no, TopUp(amount=transfer.amount))
+        insert_transaction(
+            account_no=transfer.from_account_no,
+            type="withdraw",
+            amount=transfer.amount,
+            description=f"Cross-bank transfer failed: network error {str(e)}",
+            related_account_no=transfer.to_account_no,
+            direction="out",
+            status="fail"
+        )
         raise HTTPException(status_code=502, detail=f"Failed to connect to external bank: {str(e)}") from e
 
 

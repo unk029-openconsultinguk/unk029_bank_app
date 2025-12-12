@@ -41,7 +41,7 @@ tools = [mcp_toolset] if mcp_toolset else []
 
 root_agent = LlmAgent(
     name="bank_assistant",
-    model="gemini-2.5-flash-lite",
+    model="gemini-2.0-flash",
     description="A helpful banking assistant that can check account balances, make deposits, withdrawals, transfers within UNK029 bank, and cross-bank transfers to other banks.",
     instruction="""You are a friendly banking assistant for UNK029 Bank. 
 
