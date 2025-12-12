@@ -86,11 +86,11 @@ build-backend = "hatchling.build"
 path = "src/unk029/__about__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/unk029"]
+packages = ["src/unk029", "codeenigma_runtime"]
 
 [tool.poetry]
 name = "unk029"
-version = "0.1.0"
+version = "0.0.1"
 
 
 # For non-src directory projects, explicitly set top level model name:
