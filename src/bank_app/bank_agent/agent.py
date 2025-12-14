@@ -1,5 +1,5 @@
 """
-UNK029 Banking Agent - Google ADK Agent with MCP Server Tools
+UNK Banking Agent - Google ADK Agent with MCP Server Tools
 Uses Google ADK to create a banking assistant that connects to MCP Server.
 Architecture: ADK Agent -> MCP Server -> Bank API -> Oracle DB
 """
@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # MCP Server URL (configurable via environment)
-MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://mcp_server:8002/mcp")
+# FastMCP SSE transport exposes at /sse endpoint
+MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://mcp_server:8002") + "/sse"
 
 # ============ CREATE ADK AGENT WITH MCP TOOLS ============
 
@@ -42,31 +43,38 @@ tools = [mcp_toolset] if mcp_toolset else []
 
 root_agent = LlmAgent(
     name="bank_assistant",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash-lite",
     description=(
         "A helpful banking assistant that can check account balances, make deposits, "
-        "withdrawals, transfers within UNK029 bank, and cross-bank transfers to other banks."
+        "withdrawals, transfers within UNK bank, and cross-bank transfers to other banks."
     ),
     instruction=(
-        "You are a friendly banking assistant for UNK029 Bank.\n\n"
-        "Help users with their banking needs including:\n"
-        "- Checking balances\n"
-        "- Deposits (topup)\n"
-        "- Withdrawals\n"
-        "- Transfers within UNK029 bank\n"
-        "- Cross-bank transfers to other banks (supported: urr034, ubf041)\n\n"
-        "For cross-bank transfers, use the cross_bank_transfer tool with:\n"
-        "- from_account_no: The user's UNK029 account\n"
-        "- to_bank: The destination bank code ('urr034' or 'ubf041')\n"
-        "- to_account_no: The account number at the destination bank\n"
-        "- amount: The amount to transfer.\n\n"
-        "Be professional and helpful. Always verify amounts with the user before "
-        "processing transfers."
+        "You are a friendly banking assistant for UNK Bank.\n\n"
+        "CRITICAL TRANSFER WORKFLOW (follow exactly):\n"
+        "1. Check if FROM account exists: call check_account_exists with from_account_no ONCE\n"
+        "2. Check if TO account exists: call check_account_exists with to_account_no ONCE\n"
+        "3. Decision logic:\n"
+        "   - If TO account exists in UNK → use unk_bank with action='transfer' and payload containing from_account_no, to_account_no, amount\n"
+        "   - If TO account does NOT exist → Ask user for the destination bank sort code (e.g., 60-00-01 for URR034 or 20-40-41 for UBF041)\n"
+        "4. When user provides sort code → use cross_bank_transfer with the sort code\n\n"
+        "IMPORTANT RULES:\n"
+        "- Call check_account_exists only twice per transfer (once for from, once for to)\n"
+        "- Do NOT call get_available_banks unless specifically requested\n"
+        "- Do NOT ask if same bank or different - detect automatically\n"
+        "- Do NOT ask for bank names or codes - ONLY ask for sort codes for external transfers\n"
+        "- Process transfers immediately when both accounts exist in UNK\n\n"
+        "SORT CODES:\n"
+        "- 60-00-01 = URR034 Bank\n"
+        "- 20-40-41 = UBF041 Bank\n\n"
+        "OTHER SERVICES:\n"
+        "- Check balance: use unk_bank with action='get_account'\n"
+        "- Deposit/topup: use unk_bank with action='topup'\n"
+        "- Withdrawal: use unk_bank with action='withdraw'\n\n"
+        "Be efficient - minimize tool calls and questions."
     ),
     tools=tools,
 )
 
-
-if __name__ == "__main__":
-    # There is no FastAPI app in this module; this is a placeholder for future CLI/server
-    print("This module does not start a server directly.")
+# ============ EXPOSE ADK SERVER ============
+# Export root_agent for ADK server to discover
+__all__ = ["root_agent"]

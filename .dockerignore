@@ -11,6 +11,9 @@
 !requirements.txt
 !requirements-nexus.txt
 
+!frontend
+!frontend/**
+
 # Filter unwanted files from included folders.
 **/__pycache__
 **.py[cod]

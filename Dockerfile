@@ -46,21 +46,16 @@ ARG PYPI_USER
 ARG PYPI_PASSWORD
 
 # Copy in project dependency specification.
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 
 # Copy requirements-nexus.txt
 COPY requirements-nexus.txt ./
 
-# Copy in only bank_app source (unk029 comes from Nexus as a package)
-COPY src/bank_app ./src/bank_app
+# Copy source code (both unk029 and bank_app)
+COPY src ./src
 
-# Install dependencies from Nexus and only bank_app locally
-# Tell uv not to install the local project to ensure unk029 is pulled from Nexus.
-RUN UV_EXTRA_INDEX_URL="https://${PYPI_USER}:${PYPI_PASSWORD}@${PYPI_HOST}/simple/" \
-  uv sync --no-default-groups --no-install-project
-
-# Copy in only bank_app source (unk029 comes from Nexus as a package)
-COPY src/bank_app ./src/bank_app
+# Install dependencies and the project (--prerelease allow for google-adk)
+RUN uv sync --prerelease allow
 
 ## Final Image
 # The image used in the final image MUST match exactly to the python_builder image.
@@ -105,15 +100,11 @@ RUN chown -R user:user ${HOME}
 
 # Run the FastAPI application using uvicorn
 # Override CMD below for multi-service support
-ENV SERVICE=fastapi
 CMD ["sh", "-c", "case \"$SERVICE\" in \
-  mcp_server) uvicorn bank_app.mcpserver:app --host 0.0.0.0 --port 8002 ;; \
+  mcp_server) python src/bank_app/mcpserver.py ;; \
   fastapi) uvicorn bank_app.api:app --host 0.0.0.0 --port 8001 ;; \
   dev_ui) adk web --host 0.0.0.0 --port 8003 --url_prefix /dev-ui ./src/bank_app ;; \
   *) echo \"Unknown service: $SERVICE\" && exit 1 ;; \
 esac"]
 
 USER user
-
-
-

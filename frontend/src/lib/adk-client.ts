@@ -1,44 +1,42 @@
 // Simple ADK client - Frontend → ADK → MCP → FastAPI → DB
 
 export async function createSession(userId: string) {
-  const res = await fetch(`/apps/bank_agent/users/${userId}/sessions`, {
+  const res = await fetch('/apps/bank_assistant/sessions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: '{}',
+    body: JSON.stringify({ user_id: userId }),
   });
-  if (!res.ok) throw new Error('Failed to create session');
+  if (!res.ok) throw new Error('Session failed');
   return res.json();
 }
 
 export async function sendMessage(
   userId: string,
   sessionId: string,
-  message: string
+  text: string
 ): Promise<string> {
   const res = await fetch('/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      app_name: 'bank_agent',
+      app_name: 'bank_assistant',
       user_id: userId,
       session_id: sessionId,
-      new_message: { role: 'user', parts: [{ text: message }] },
+      messages: [{ role: 'user', parts: [{ text }] }],
     }),
   });
 
-  if (!res.ok) throw new Error('Failed to send message');
+  if (!res.ok) throw new Error('Run failed');
 
-  const events = await res.json();
-  
-  // Extract last assistant message (response is array of events)
+  const data = await res.json();
+  const events = Array.isArray(data) ? data : [data];
+
   for (let i = events.length - 1; i >= 0; i--) {
-    const event = events[i];
-    // Check author is not 'user' and has text content
-    if (event.content?.parts && event.author !== 'user') {
-      const text = event.content.parts.map((p: any) => p.text || '').join('');
-      if (text) return text;
+    const e = events[i];
+    if (e.author !== 'user' && e.content?.parts) {
+      return e.content.parts.map((p: any) => p.text).join('');
     }
   }
 
-  return 'No response from assistant';
+  return 'No response';
 }
