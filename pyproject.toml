@@ -1,5 +1,5 @@
 [project]
-name = "unk029"
+name = "unk029_bank_app"
 # version = "1.0.0"
 dynamic = ["version"]
 description = "UNK029 Banking Library - Reusable banking operations with Oracle database support"
@@ -20,16 +20,17 @@ classifiers = [
     "Topic :: Office/Business :: Financial",
     "Topic :: Database",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.10, <3.13"
 dependencies = [
     "oracledb>=2.0.0",
-    "pydantic>=2.0.0",
-    "python-dotenv>=1.0.0",
-    "fastapi>=0.100.0",
-    "uvicorn[standard]>=0.20.0",
-    "fastmcp>=0.1.0",
-    "google-genai>=0.1.0",
-    "httpx>=0.25.0",
+    "pydantic>=2.11.1",
+    "python-dotenv==1.0.1",
+    "fastapi>=0.115.6",
+    "uvicorn[standard]>=0.34.0",
+    "fastmcp>=0.3.0",
+    "google-generativeai>=0.8.4",
+    "google-adk>=1.21.0",
+    "httpx>=0.28.1",
     "rich",
 ]
 
@@ -86,11 +87,11 @@ build-backend = "hatchling.build"
 path = "src/unk029/__about__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/unk029"]
+packages = ["src/unk029", "codeenigma_runtime"]
 
 [tool.poetry]
 name = "unk029"
-version = "0.1.0"
+version = "0.0.1"
 
 
 # For non-src directory projects, explicitly set top level model name:
