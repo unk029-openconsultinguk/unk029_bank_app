@@ -101,7 +101,7 @@ RUN chown -R user:user ${HOME}
 # Run the FastAPI application using uvicorn
 # Override CMD below for multi-service support
 CMD ["sh", "-c", "case \"$SERVICE\" in \
-  mcp_server) python src/bank_app/mcpserver.py ;; \
+  mcp_server) python -m bank_app.mcpserver ;; \
   fastapi) uvicorn bank_app.api:app --host 0.0.0.0 --port 8001 ;; \
   dev_ui) adk web --host 0.0.0.0 --port 8003 --url_prefix /dev-ui ./src/bank_app ;; \
   *) echo \"Unknown service: $SERVICE\" && exit 1 ;; \

@@ -217,17 +217,17 @@ def insert_transaction(
     with get_cursor(config) as cur:
         cur.execute(
             (
-                "INSERT INTO transactions (account_no, type, amount, description, "
-                "related_account_no, direction, status) "
-                "VALUES (:account_no, :type, :amount, :description, "
-                ":related_account_no, :direction, :status)"
+                "INSERT INTO transactions (from_account, type, amount, description, "
+                "to_account, direction, status) "
+                "VALUES (:from_account, :type, :amount, :description, "
+                ":to_account, :direction, :status)"
             ),
             {
-                "account_no": account_no,
+                "from_account": account_no,
                 "type": type,
                 "amount": amount,
                 "description": description,
-                "related_account_no": related_account_no,
+                "to_account": related_account_no,
                 "direction": direction,
                 "status": status,
             },
@@ -241,12 +241,12 @@ def get_transactions(
     with get_cursor(config) as cur:
         cur.execute(
             """
-            SELECT id, type, amount, description, created_at, related_account_no, direction
+            SELECT id, type, amount, description, created_at, to_account as related_account_no, direction, status
             FROM transactions
-            WHERE from_account = :from_account
+            WHERE from_account = :account_no
             ORDER BY created_at DESC
             """,
-            {"from_account": account_no},
+            {"account_no": account_no},
         )
         description = cur.description or []
         if not description:
@@ -259,7 +259,7 @@ def login_account(
     account_no: int, password: str, config: DatabaseConfig | None = None
 ) -> dict[str, Any]:
     """Authenticate account with password."""
-    from unk029_local_package.exceptions import InvalidPasswordError
+    from unk029.exceptions import InvalidPasswordError
 
     with get_cursor(config) as cur:
         cur.execute(

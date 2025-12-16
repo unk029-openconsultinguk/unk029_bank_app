@@ -54,7 +54,35 @@ def login_endpoint(login: LoginRequest) -> Any:
 @app.post("/account/transfer")
 def transfer_account_endpoint(transfer: Transfer) -> Any:
     try:
-        return transfer_account(transfer)
+        result = transfer_account(transfer)
+        
+        # Get account names for friendly descriptions
+        from_account = get_account(transfer.from_account_no)
+        to_account = get_account(transfer.to_account_no)
+        
+        # Record transaction for sender (outgoing)
+        insert_transaction(
+            account_no=transfer.from_account_no,
+            type="transfer",
+            amount=transfer.amount,
+            description=f"Transferred to account {transfer.to_account_no}, {to_account['name']}",
+            related_account_no=transfer.to_account_no,
+            direction="out",
+            status="success",
+        )
+        
+        # Record transaction for receiver (incoming)
+        insert_transaction(
+            account_no=transfer.to_account_no,
+            type="transfer",
+            amount=transfer.amount,
+            description=f"Transferred from account {transfer.from_account_no}, {from_account['name']}",
+            related_account_no=transfer.from_account_no,
+            direction="in",
+            status="success",
+        )
+        
+        return result
     except AccountNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except InsufficientFundsError as e:
@@ -153,21 +181,23 @@ PARTNER_BANKS = [
         "url": "/api",
         "isInternal": True,
         "transferMethod": "internal",
+        "sort_code": "77-91-21",
     },
     {
         "code": "urr034",
         "name": "Purple Bank",
         "url": URR034_BANK_URL,
         "isInternal": False,
-        # POST /transfer/?from_account_id=X&to_account_id=Y&amount=Z
-        "transferMethod": "query_params",
+        "transferMethod": "query_params",  # POST /api/deposit/?account_number&amount
+        "sort_code": "60-00-01",
     },
     {
         "code": "ubf041",
         "name": "Bartley Bank",
         "url": UBF041_BANK_URL,
         "isInternal": False,
-        "transferMethod": "deposit",  # POST /deposit with JSON body
+        "transferMethod": "deposit",  # POST /api/deposit with JSON body
+        "sort_code": "20-40-41",
     },
 ]
 
@@ -240,20 +270,21 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
         method = target_bank["transferMethod"]
 
         if method == "query_params":
-            # URR034 style: POST /transfer/?to_account_id=Y&amount=Z
-            # (omit from_account_id for cross-bank)
+            # URR034 (Purple Bank): POST {base_api}/deposit/ with query parameters
             response = requests.post(
-                f"{bank_url}/transfer/",
+                f"{bank_url.rstrip('/')}/deposit/",
                 params={
-                    "to_account_id": transfer.to_account_no,
+                    "account_number": str(transfer.to_account_no),
                     "amount": transfer.amount,
                 },
                 timeout=30,
+                verify=False,
+                allow_redirects=True,
             )
         elif method == "deposit":
-            # UBF041 style: POST /deposit with JSON body
+            # UBF041 style: POST {base_api}/deposit with JSON body
             response = requests.post(
-                f"{bank_url}/deposit",
+                f"{bank_url.rstrip('/')}/deposit",
                 json={
                     "account_number": str(transfer.to_account_no),
                     "sort_code": transfer.to_sort_code,
@@ -305,10 +336,7 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
             account_no=transfer.from_account_no,
             type="withdraw",
             amount=transfer.amount,
-            description=(
-                f"From {transfer.from_account_no} to {transfer.to_account_no} "
-                f"({transfer.to_name}) at {target_bank['name']}"
-            ),
+            description=f"Transferred to {transfer.to_name}, account {transfer.to_account_no}, {target_bank['name']}",
             related_account_no=transfer.to_account_no,
             direction="out",
             status="success",
@@ -351,6 +379,8 @@ def get_account_transactions(account_no: int) -> Any:
         return {"transactions": get_transactions(account_no)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 
 
 if __name__ == "__main__":
