@@ -1,12 +1,9 @@
 """FastAPI Server - Core banking API
 Handles account management and banking operations.
 """
-
 import os
 from typing import Any
-
 from fastapi import FastAPI, Header, HTTPException
-
 from unk029.database import (
     add_payee,
     create_account,
@@ -20,6 +17,7 @@ from unk029.database import (
     update_account,
     withdraw_account,
 )
+from unk029_local_package.banks import EXTERNAL_BANKS, INTERNAL_BANK
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError, InvalidPasswordError
 from unk029.models import (
     AccountCreate,
@@ -42,7 +40,6 @@ app = FastAPI(
 
 
 # ============== API Endpoints ==============
-
 
 @app.post("/account/login", include_in_schema=False)
 def login_endpoint(login: LoginRequest) -> Any:
@@ -223,63 +220,13 @@ def list_payees_endpoint(user_account_no: int) -> list[dict[str, Any]]:
         return list_payees(user_account_no)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-
-
-# ============== Partner Banks Configuration ==============
-# Bank URLs are loaded from environment variables (set in .env file)
-URR034_BANK_URL = os.getenv("URR034_BANK_URL", "")
-UBF041_BANK_URL = os.getenv("UBF041_BANK_URL", "")
-UIA037_BANK_URL = os.getenv("UIA037_BANK_URL", "")
-USS016_BANK_URL = os.getenv("USS016_BANK_URL", "")
-
-PARTNER_BANKS = [
-    {
-        "code": "unk029",
-        "name": "UNK Bank (Internal)",
-        "url": "/api",
-        "isInternal": True,
-        "transferMethod": "internal",
-        "sort_code": "11-11-11",
-    },
-    {
-        "code": "urr034",
-        "name": "Purple Bank",
-        "url": URR034_BANK_URL,
-        "isInternal": False,
-        "transferMethod": "query_params",  # POST /api/deposit/?account_number&amount
-        "sort_code": "60-00-01",
-    },
-    # {
-    #     "code": "uia037",
-    #     "name": "Secure Bank",
-    #     "url": UIA037_BANK_URL,
-    #     "isInternal": False,
-    #     "transferMethod": "deposit",  # POST /api/deposit with JSON body
-    #     "sort_code": "11-22-33",
-    # },
-    # {
-    #     "code": "uss016",
-    #     "name": "AppyPay",
-    #     "url": USS016_BANK_URL,
-    #     "isInternal": False,
-    #     "transferMethod": "deposit",  # POST /api/deposit with JSON body
-    #     "sort_code": "33-44-55",
-    # },
-    {
-        "code": "ubf041",
-        "name": "Bartley Bank",
-        "url": UBF041_BANK_URL,
-        "isInternal": False,
-        "transferMethod": "deposit",  # POST /api/deposit with JSON body
-        "sort_code": "20-40-41",
-    },
-]
-
+        
+# ============== Cross Bank Transfers ==============
 
 @app.get("/banks", include_in_schema=False)
 def get_partner_banks() -> list[dict[str, Any]]:
     """Get list of available banks for transfers."""
-    return PARTNER_BANKS
+    return [INTERNAL_BANK] + EXTERNAL_BANKS
 
 
 @app.post("/account/cross-bank-transfer")
@@ -306,7 +253,7 @@ def cross_bank_transfer(
         )
 
     # Find the target bank
-    target_bank = next((b for b in PARTNER_BANKS if b["code"] == transfer.to_bank_code), None)
+    target_bank = next((b for b in EXTERNAL_BANKS if b["code"] == transfer.to_bank_code), None)
     if not target_bank:
         raise HTTPException(status_code=400, detail=f"Unknown bank: {transfer.to_bank_code}")
 
