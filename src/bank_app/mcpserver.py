@@ -101,7 +101,7 @@ def transfer_money(
         if source_check.status_code != 200:
             return f"Source account {from_account_no} not found in UNK Bank"
     except Exception as exc:
-        return f"Error checking source account: {str(exc)}"
+        return f"Error checking source account: {exc!s}"
     
     # Check if destination bank exists (normalize input like 600001 or 60-00-01)
     norm_to_sc = _norm_sort_code(to_sort_code)
@@ -167,7 +167,7 @@ def transfer_money(
             
         except Exception as exc:
             logger.error(f"Withdrawal error: {exc}")
-            return f"Withdrawal failed: {str(exc)}"
+            return f"Withdrawal failed: {exc!s}"
         
         # Step 2: Deposit to external bank
         try:

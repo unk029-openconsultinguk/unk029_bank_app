@@ -11,7 +11,16 @@ from dotenv import load_dotenv
 import oracledb
 
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
-from unk029.models import AccountCreate, Deposit, Transfer, WithDraw, PayeeCreate, Payee, LoginRequest
+from unk029.models import (
+    AccountCreate,
+    Deposit,
+    LoginRequest,
+    Payee,
+    PayeeCreate,
+    Transfer,
+    WithDraw,
+)
+
 load_dotenv()
 
 
@@ -263,7 +272,7 @@ def login_account(
     login: 'LoginRequest', config=None
 ) -> dict[str, Any]:
     """Authenticate account with password using account_no or email."""
-    from unk029.exceptions import InvalidPasswordError, AccountNotFoundError
+    from unk029.exceptions import AccountNotFoundError, InvalidPasswordError
 
     with get_cursor(config) as cur:
         if login.account_no is not None:
@@ -316,7 +325,7 @@ def add_payee(payee: 'PayeeCreate', config=None) -> dict[str, Any]:
             },
         )
         row = cur.fetchone()
-        return dict(zip([d[0].lower() for d in cur.description], row))
+        return dict(zip([d[0].lower() for d in cur.description], row, strict=False))
 
 def list_payees(user_account_no: int, config=None) -> list[dict[str, Any]]:
     """List all payees for a user."""
@@ -326,7 +335,7 @@ def list_payees(user_account_no: int, config=None) -> list[dict[str, Any]]:
             {"user_account_no": user_account_no},
         )
         columns = [d[0].lower() for d in cur.description]
-        return [dict(zip(columns, row)) for row in cur.fetchall()]
+        return [dict(zip(columns, row, strict=False)) for row in cur.fetchall()]
 
 
 def update_account(account_no: int, email: str | None = None, mobile: str | None = None, password: str | None = None, config: DatabaseConfig | None = None) -> dict[str, Any]:
