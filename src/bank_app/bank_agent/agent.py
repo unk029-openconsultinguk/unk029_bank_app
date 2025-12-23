@@ -81,7 +81,7 @@ root_agent = LlmAgent(
         "- When asking for sort code, STOP and wait for user input\n"
         "- Speak like a helpful bank assistant, not a robot"
     ),
-    tools=tools,
+    tools=tools,  # type: ignore[arg-type]
 )
 
 # ============ EXPOSE ADK SERVER ============

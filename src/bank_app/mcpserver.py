@@ -29,7 +29,8 @@ def _fetch_banks() -> list[dict[str, Any]]:
             res = client.get(f"{BANK_API}/banks")
         if res.status_code != 200:
             raise RuntimeError(f"Failed to load banks: {res.status_code}")
-        return res.json()
+        banks: list[dict[str, Any]] = res.json()
+        return banks
     except Exception as exc:
         logger.error(f"Could not fetch banks from API: {exc}")
         return []
@@ -52,7 +53,7 @@ def transfer_money(
     to_sort_code: str | None = None,
     amount: float = 0.0,
     logged_in_account_no: str | None = None,
-) -> dict[str, Any]:
+) -> str | dict[str, Any]:
     """
     Transfer money between accounts using sort codes.
     - For INTERNAL transfers (same bank UNK→UNK): to_sort_code is optional (not needed)
@@ -105,11 +106,9 @@ def transfer_money(
 
     # Validate source bank is our internal bank
     if _norm_sort_code(from_sort_code) != internal_sc:
-        return (
-            f"Can only transfer from "
-            f"{internal_bank.get('name', 'UNK Bank')} accounts "
-            f"({internal_bank.get('sort_code', '11-11-11')})"
-        )
+        bank_name = internal_bank.get("name", "UNK Bank") if internal_bank else "UNK Bank"
+        bank_sortcode = internal_bank.get("sort_code", "11-11-11") if internal_bank else "11-11-11"
+        return f"Can only transfer from {bank_name} accounts ({bank_sortcode})"
 
     # Check source account exists
     try:
@@ -130,7 +129,8 @@ def transfer_money(
 
     # INTERNAL TRANSFER (same bank)
     if _norm_sort_code(to_sort_code) == internal_sc:
-        logger.info(f"Internal transfer within {internal_bank.get('name', 'UNK Bank')}")
+        bank_name = internal_bank.get("name", "UNK Bank") if internal_bank else "UNK Bank"
+        logger.info(f"Internal transfer within {bank_name}")
         try:
             url = f"{BANK_API}/account/transfer"
             payload = {
@@ -145,10 +145,11 @@ def transfer_money(
                 response = client.post(url, json=payload, headers=headers)
 
             if response.status_code == 200:
+                bank_name = internal_bank.get("name", "UNK Bank") if internal_bank else "UNK Bank"
                 return (
                     f"Successfully transferred £{amount:.2f} from account "
                     f"{from_account_no} to account {to_account_no} at "
-                    f"{internal_bank.get('name', 'UNK Bank')}. The money has been sent."
+                    f"{bank_name}. The money has been sent."
                 )
             else:
                 error_text = response.text
@@ -205,9 +206,9 @@ def transfer_money(
             if method == "query_params":
                 # Deposit via query params at {base_api}/deposit/
                 url = f"{base_url}/deposit/"
-                params = {
+                params: dict[str, str] = {
                     "account_number": str(to_account_no),
-                    "amount": float(amount),
+                    "amount": str(amount),
                 }
 
                 with httpx.Client(timeout=30.0, verify=False, follow_redirects=True) as client:
