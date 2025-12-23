@@ -25,6 +25,7 @@ class WithDraw(BaseModel):
 
     amount: float
 
+
 class LoginRequest(BaseModel):
     account_no: int | None = None
     email: str | None = None
@@ -58,11 +59,13 @@ class CrossBankTransfer(BaseModel):
     to_name: str
     amount: float
 
+
 class PayeeCreate(BaseModel):
     user_account_no: int
     payee_name: str
     payee_account_no: int
     payee_sort_code: str
+
 
 class Payee(BaseModel):
     id: int
@@ -75,7 +78,7 @@ class Payee(BaseModel):
 
 class AccountUpdate(BaseModel):
     """Model for updating account details."""
-    
+
     email: str | None = None
     mobile: str | None = None
     password: str | None = None

@@ -11,15 +11,7 @@ from dotenv import load_dotenv
 import oracledb
 
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
-from unk029.models import (
-    AccountCreate,
-    Deposit,
-    LoginRequest,
-    Payee,
-    PayeeCreate,
-    Transfer,
-    WithDraw,
-)
+from unk029.models import AccountCreate, Deposit, LoginRequest, PayeeCreate, Transfer, WithDraw
 
 load_dotenv()
 
@@ -121,7 +113,6 @@ def create_account(account: AccountCreate, config: DatabaseConfig | None = None)
             "password": account.password,
             "email": account.email,
         }
-
 
 
 def deposit_account(
@@ -254,7 +245,9 @@ def get_transactions(
     with get_cursor(config) as cur:
         cur.execute(
             """
-            SELECT id, type, amount, description, created_at, to_account as related_account_no, direction, status
+            SELECT 
+                id, type, amount, description, created_at, 
+                to_account as related_account_no, direction, status
             FROM transactions
             WHERE from_account = :account_no
             ORDER BY created_at DESC
@@ -269,7 +262,7 @@ def get_transactions(
 
 
 def login_account(
-    login: 'LoginRequest', config=None
+    login: "LoginRequest", config: DatabaseConfig | None = None
 ) -> dict[str, Any]:
     """Authenticate account with password using account_no or email."""
     from unk029.exceptions import AccountNotFoundError, InvalidPasswordError
@@ -292,11 +285,13 @@ def login_account(
                 {"email": login.email},
             )
         else:
-            raise AccountNotFoundError('No account_no or email provided')
+            raise AccountNotFoundError(0)
         row = cur.fetchone()
         if not row:
-            raise AccountNotFoundError(login.account_no or login.email)
+            account_id = login.account_no if login.account_no is not None else 0
+            raise AccountNotFoundError(account_id)
         import logging
+
         logging.basicConfig(level=logging.INFO)
         logging.info(f"DB password: '{row[4]}' | Input password: '{login.password}'")
         if row[4] != login.password:
@@ -308,14 +303,21 @@ def login_account(
             "sortcode": row[3],
         }
 
-def add_payee(payee: 'PayeeCreate', config=None) -> dict[str, Any]:
+
+def add_payee(
+    payee: "PayeeCreate", config: DatabaseConfig | None = None
+) -> dict[str, Any]:
     """Insert a new payee for a user."""
     with get_cursor(config) as cur:
         cur.execute(
             """
-            INSERT INTO payee (user_account_no, payee_name, payee_account_no, payee_sort_code)
-            VALUES (:user_account_no, :payee_name, :payee_account_no, :payee_sort_code)
-            RETURNING id, user_account_no, payee_name, payee_account_no, payee_sort_code, created_at
+            INSERT INTO payee 
+                (user_account_no, payee_name, payee_account_no, payee_sort_code)
+            VALUES 
+                (:user_account_no, :payee_name, :payee_account_no, :payee_sort_code)
+            RETURNING 
+                id, user_account_no, payee_name, payee_account_no, 
+                payee_sort_code, created_at
             """,
             {
                 "user_account_no": payee.user_account_no,
@@ -325,43 +327,63 @@ def add_payee(payee: 'PayeeCreate', config=None) -> dict[str, Any]:
             },
         )
         row = cur.fetchone()
+        if cur.description is None:
+            return {}
         return dict(zip([d[0].lower() for d in cur.description], row, strict=False))
 
-def list_payees(user_account_no: int, config=None) -> list[dict[str, Any]]:
+
+def list_payees(
+    user_account_no: int, config: DatabaseConfig | None = None
+) -> list[dict[str, Any]]:
     """List all payees for a user."""
     with get_cursor(config) as cur:
         cur.execute(
-            "SELECT id, user_account_no, payee_name, payee_account_no, payee_sort_code, created_at FROM payee WHERE user_account_no = :user_account_no ORDER BY created_at DESC",
+            """
+            SELECT 
+                id, user_account_no, payee_name, payee_account_no, 
+                payee_sort_code, created_at 
+            FROM payee 
+            WHERE user_account_no = :user_account_no 
+            ORDER BY created_at DESC
+            """,
             {"user_account_no": user_account_no},
         )
+        if cur.description is None:
+            return []
         columns = [d[0].lower() for d in cur.description]
         return [dict(zip(columns, row, strict=False)) for row in cur.fetchall()]
 
 
-def update_account(account_no: int, email: str | None = None, mobile: str | None = None, password: str | None = None, config: DatabaseConfig | None = None) -> dict[str, Any]:
+def update_account(
+    account_no: int,
+    email: str | None = None,
+    mobile: str | None = None,
+    password: str | None = None,
+    config: DatabaseConfig | None = None,
+) -> dict[str, Any]:
     """Update account details (email, mobile, password)."""
     with get_cursor(config) as cur:
         # Build update query dynamically based on provided fields
         updates = []
         params: dict[str, Any] = {"account_no": account_no}
-        
+
         if email is not None:
             updates.append("email = :email")
             params["email"] = email
-        
+
         if mobile is not None:
             updates.append("mobile = :mobile")
             params["mobile"] = mobile
-        
+
         if password is not None:
             updates.append("password = :password")
             params["password"] = password
-        
+
         if not updates:
             # Nothing to update
             return get_account(account_no, config)
-        
+
         query = f"UPDATE accounts SET {', '.join(updates)} WHERE account_no = :account_no"
         cur.execute(query, params)
-        
+
         return get_account(account_no, config)

@@ -64,7 +64,8 @@ root_agent = LlmAgent(
         "RESPONSE HANDLING (CRITICAL):\n"
         "After ANY tool call, you receive a result. Parse it and respond in PLAIN TEXT:\n\n"
         "IF tool result contains 'success': true or 'Successfully transferred':\n"
-        "  → Say: 'Successfully transferred £X from account A to account B at [bank name]. The money has been sent.'\n\n"
+        "  → Say: 'Successfully transferred £X from account A to account B at "
+        "[bank name]. The money has been sent.'\n\n"
         "IF tool result says 'Please provide the destination bank sort code':\n"
         "  → Just repeat that message exactly as received\n"
         "  → WAIT for user to provide sort code\n"
@@ -74,7 +75,7 @@ root_agent = LlmAgent(
         "IF tool result contains other error:\n"
         "  → Extract the error message and say it in plain English\n\n"
         "ABSOLUTE RULES:\n"
-        "- NEVER show JSON like {\"success\": false, \"error\": \"...\"}\n"
+        '- NEVER show JSON like {"success": false, "error": "..."}\n'
         "- NEVER show field names or quotes\n"
         "- ALWAYS extract the actual message and say it naturally\n"
         "- When asking for sort code, STOP and wait for user input\n"

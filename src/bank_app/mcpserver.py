@@ -20,7 +20,7 @@ def _norm_sort_code(code: str | None) -> str | None:
     if not code:
         return None
     digits = "".join(ch for ch in str(code) if ch.isdigit())
-    return digits if len(digits) == 6 else digits
+    return digits  # if len(digits) == 6 else digits
 
 
 def _fetch_banks() -> list[dict[str, Any]]:
@@ -51,21 +51,23 @@ def transfer_money(
     to_account_no: str,
     to_sort_code: str | None = None,
     amount: float = 0.0,
-    logged_in_account_no: str | None = None
+    logged_in_account_no: str | None = None,
 ) -> dict[str, Any]:
     """
     Transfer money between accounts using sort codes.
     - For INTERNAL transfers (same bank UNK→UNK): to_sort_code is optional (not needed)
     - For EXTERNAL transfers (different bank): to_sort_code is required
-    
+
     Args:
         from_account_no: Source UNK Bank account number (the sender)
         from_sort_code: Must be "11-11-11" (UNK Bank sort code)
         to_account_no: Destination account number (where money goes)
-        to_sort_code: Optional. Destination bank sort code - "11-11-11" for UNK internal, "60-00-01" for Purple Bank, "20-40-41" for Bartley Bank. If omitted, defaults to internal UNK transfer.
+        to_sort_code: Optional. Destination bank sort code - "11-11-11" for UNK
+            internal, "60-00-01" for Purple Bank, "20-40-41" for Bartley Bank.
+            If omitted, defaults to internal UNK transfer.
         amount: Amount to transfer
         logged_in_account_no: The currently logged-in account (for security validation)
-    
+
     Returns:
         Transfer result with success status and message
     """
@@ -73,27 +75,42 @@ def transfer_money(
     banks = _fetch_banks()
     internal_bank = next((b for b in banks if b.get("isInternal")), None)
     internal_sc = _norm_sort_code(internal_bank.get("sort_code") if internal_bank else None)
-    
+
     # If to_sort_code not provided, default to internal UNK bank
     if to_sort_code is None:
         to_sort_code = internal_bank.get("sort_code", "11-11-11") if internal_bank else "11-11-11"
-    
-    logger.info(f"Transfer request: {from_account_no}@{from_sort_code} → {to_account_no}@{to_sort_code}, amount={amount}, logged_in={logged_in_account_no}")
+
+    logger.info(
+        f"Transfer request: {from_account_no}@{from_sort_code} → "
+        f"{to_account_no}@{to_sort_code}, amount={amount}, "
+        f"logged_in={logged_in_account_no}"
+    )
 
     # SECURITY: Validate that sender is the logged-in user
     if logged_in_account_no and from_account_no != logged_in_account_no:
-        return {"success": False, "error": f"You can only transfer from your own account ({logged_in_account_no}). Cannot transfer from account {from_account_no}."}
+        return {
+            "success": False,
+            "error": (
+                f"You can only transfer from your own account "
+                f"({logged_in_account_no}). Cannot transfer from "
+                f"account {from_account_no}."
+            ),
+        }
 
     # Load partner banks dynamically from API (no hard-coded mapping)
     banks = _fetch_banks()
     sc_index = _build_sortcode_index(banks)
     internal_bank = next((b for b in banks if b.get("isInternal")), None)
     internal_sc = _norm_sort_code(internal_bank.get("sort_code") if internal_bank else None)
-    
+
     # Validate source bank is our internal bank
     if _norm_sort_code(from_sort_code) != internal_sc:
-        return f"Can only transfer from {internal_bank.get('name','UNK Bank')} accounts ({internal_bank.get('sort_code','11-11-11')})"
-    
+        return (
+            f"Can only transfer from "
+            f"{internal_bank.get('name', 'UNK Bank')} accounts "
+            f"({internal_bank.get('sort_code', '11-11-11')})"
+        )
+
     # Check source account exists
     try:
         with httpx.Client(timeout=10.0) as client:
@@ -102,7 +119,7 @@ def transfer_money(
             return f"Source account {from_account_no} not found in UNK Bank"
     except Exception as exc:
         return f"Error checking source account: {exc!s}"
-    
+
     # Check if destination bank exists (normalize input like 600001 or 60-00-01)
     norm_to_sc = _norm_sort_code(to_sort_code)
     if not norm_to_sc:
@@ -110,25 +127,29 @@ def transfer_money(
     dest_bank = sc_index.get(norm_to_sc)
     if not dest_bank:
         return f"Unknown destination sort code: {to_sort_code}"
-    
+
     # INTERNAL TRANSFER (same bank)
     if _norm_sort_code(to_sort_code) == internal_sc:
-        logger.info(f"Internal transfer within {internal_bank.get('name','UNK Bank')}")
+        logger.info(f"Internal transfer within {internal_bank.get('name', 'UNK Bank')}")
         try:
             url = f"{BANK_API}/account/transfer"
             payload = {
                 "from_account_no": from_account_no,
                 "to_account_no": to_account_no,
-                "amount": amount
+                "amount": amount,
             }
             # Include the logged-in account as header for backend validation
             headers = {"X-Logged-In-Account": logged_in_account_no or from_account_no}
-            
+
             with httpx.Client(timeout=10.0) as client:
                 response = client.post(url, json=payload, headers=headers)
-            
+
             if response.status_code == 200:
-                return f"Successfully transferred £{amount:.2f} from account {from_account_no} to account {to_account_no} at {internal_bank.get('name','UNK Bank')}. The money has been sent."
+                return (
+                    f"Successfully transferred £{amount:.2f} from account "
+                    f"{from_account_no} to account {to_account_no} at "
+                    f"{internal_bank.get('name', 'UNK Bank')}. The money has been sent."
+                )
             else:
                 error_text = response.text
                 # Extract detail from JSON if present
@@ -136,39 +157,44 @@ def transfer_money(
                     error_json = json.loads(error_text)
                     if "detail" in error_json:
                         error_text = error_json["detail"]
-                except:
+                except Exception:
                     pass
                 # Check for "not found" to prompt for sort code
                 if "not found" in error_text.lower():
-                    return "Please provide the destination bank sort code (e.g., 60-00-01 for Purple Bank, 20-40-41 for Bartley Bank)."
+                    return (
+                        "Please provide the destination bank sort code "
+                        "(e.g., 60-00-01 for Purple Bank, 20-40-41 for Bartley Bank)."
+                    )
                 return error_text
-                
+
         except Exception as exc:
             logger.error(f"Internal transfer error: {exc}")
             return str(exc)
-    
+
     # EXTERNAL TRANSFER (different bank)
     else:
         logger.info(f"External transfer to {dest_bank['name']}")
-        
+
         # Step 1: Withdraw from UNK Bank
         try:
             withdraw_url = f"{BANK_API}/account/{from_account_no}/withdraw"
             withdraw_payload = {"amount": amount}
             headers = {"X-Logged-In-Account": logged_in_account_no or from_account_no}
-            
+
             with httpx.Client(timeout=10.0) as client:
-                withdraw_response = client.patch(withdraw_url, json=withdraw_payload, headers=headers)
-            
+                withdraw_response = client.patch(
+                    withdraw_url, json=withdraw_payload, headers=headers
+                )
+
             if withdraw_response.status_code != 200:
                 return f"Failed to withdraw from UNK Bank: {withdraw_response.text}"
-            
+
             logger.info(f"Withdrew {amount} from account {from_account_no}")
-            
+
         except Exception as exc:
             logger.error(f"Withdrawal error: {exc}")
             return f"Withdrawal failed: {exc!s}"
-        
+
         # Step 2: Deposit to external bank
         try:
             # Normalize base URL and build endpoint safely
@@ -208,22 +234,29 @@ def transfer_money(
 
             # Accept any 2xx as success; otherwise, rollback
             if 200 <= response.status_code < 300:
-                return f"Successfully transferred £{amount:.2f} from account {from_account_no} at UNK Bank to account {to_account_no} at {dest_bank['name']}. The money has been sent."
+                return (
+                    f"Successfully transferred £{amount:.2f} from account "
+                    f"{from_account_no} at UNK Bank to account {to_account_no} "
+                    f"at {dest_bank['name']}. The money has been sent."
+                )
             else:
                 # Rollback: refund to source account
                 logger.error(f"External deposit failed, rolling back: {response.text}")
                 rollback_url = f"{BANK_API}/account/{from_account_no}/deposit"
                 with httpx.Client(timeout=10.0) as client:
                     client.patch(rollback_url, json={"amount": amount})
-                
-                return f"External deposit to {dest_bank['name']} failed: {response.text}. Your money has been refunded."
-                
+
+                return (
+                    f"External deposit to {dest_bank['name']} failed: "
+                    f"{response.text}. Your money has been refunded."
+                )
+
         except Exception as exc:
             logger.error(f"External transfer error: {exc}")
             error_msg = str(exc)
             # Clean up error message
             if "[Errno" in error_msg:
-                error_msg = error_msg[error_msg.find("]")+1:].strip()
+                error_msg = error_msg[error_msg.find("]") + 1 :].strip()
             if "No route to host" in error_msg or "Couldn't connect" in error_msg:
                 return f"Unable to connect to {dest_bank['name']}. Please try again later."
             return f"Transfer to {dest_bank['name']} failed: {error_msg}"
