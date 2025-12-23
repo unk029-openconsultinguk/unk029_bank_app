@@ -45,17 +45,19 @@ ARG PYPI_HOST
 ARG PYPI_USER
 ARG PYPI_PASSWORD
 
-# Copy in project dependency specification.
-COPY pyproject.toml uv.lock README.md ./
-
-# Copy requirements-nexus.txt
+# Copy requirements files
 COPY requirements-nexus.txt ./
+COPY requirements.txt ./
 
-# Copy source code (both unk029 and bank_app)
-COPY src ./src
+# Copy only bank_app source code (unk029 will be installed from Nexus)
+COPY src/bank_app ./src/bank_app
 
-# Install dependencies and the project (--prerelease allow for google-adk)
-RUN uv sync --prerelease allow
+# Create virtual environment and install dependencies
+RUN uv venv ${UV_PROJECT_ENVIRONMENT} && \
+    uv pip install --python ${UV_PROJECT_ENVIRONMENT} -r requirements.txt --no-cache-dir && \
+    sed "s|\${PYPI_HOST}|${PYPI_HOST}|g; s|\${PYPI_USER}|${PYPI_USER}|g; s|\${PYPI_PASSWORD}|${PYPI_PASSWORD}|g" requirements-nexus.txt > /tmp/req-resolved.txt && \
+    uv pip install --python ${UV_PROJECT_ENVIRONMENT} -r /tmp/req-resolved.txt --no-cache-dir && \
+    rm /tmp/req-resolved.txt
 
 ## Final Image
 # The image used in the final image MUST match exactly to the python_builder image.
@@ -88,8 +90,8 @@ WORKDIR ${APP_HOME}
 COPY --from=python_builder ${UV_PROJECT_ENVIRONMENT} ${UV_PROJECT_ENVIRONMENT}
 ENV PATH="${UV_PROJECT_ENVIRONMENT}/bin:${PATH}"
 
-# Copy source files
-COPY src src
+# Copy only bank_app source files (unk029 comes from Nexus package)
+COPY src/bank_app src/bank_app
 
 # Add src to PYTHONPATH so bank_app module can be imported
 ENV PYTHONPATH="${APP_HOME}/src:${PYTHONPATH}"
