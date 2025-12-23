@@ -27,9 +27,7 @@ def test_account_create_model() -> None:
 
 def test_account_create_required_fields() -> None:
     """Test AccountCreate model with all required fields."""
-    account = AccountCreate(
-        name="Jane Doe", email="jane@example.com", password="pass123"
-    )
+    account = AccountCreate(name="Jane Doe", email="jane@example.com", password="pass123")
     assert account.name == "Jane Doe"
     assert account.email == "jane@example.com"
     assert account.password == "pass123"

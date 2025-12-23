@@ -261,9 +261,7 @@ def get_transactions(
         return [dict(zip(columns, row, strict=False)) for row in cur.fetchall()]
 
 
-def login_account(
-    login: "LoginRequest", config: DatabaseConfig | None = None
-) -> dict[str, Any]:
+def login_account(login: "LoginRequest", config: DatabaseConfig | None = None) -> dict[str, Any]:
     """Authenticate account with password using account_no or email."""
     from unk029.exceptions import AccountNotFoundError, InvalidPasswordError
 
@@ -304,9 +302,7 @@ def login_account(
         }
 
 
-def add_payee(
-    payee: "PayeeCreate", config: DatabaseConfig | None = None
-) -> dict[str, Any]:
+def add_payee(payee: "PayeeCreate", config: DatabaseConfig | None = None) -> dict[str, Any]:
     """Insert a new payee for a user."""
     with get_cursor(config) as cur:
         cur.execute(
