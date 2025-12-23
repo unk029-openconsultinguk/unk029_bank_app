@@ -5,27 +5,32 @@ Handles account management and banking operations.
 import os
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, Header, HTTPException
 
 from unk029.database import (
+    add_payee,
     create_account,
+    deposit_account,
     get_account,
     get_transactions,
     insert_transaction,
+    list_payees,
     login_account,
-    topup_account,
     transfer_account,
+    update_account,
     withdraw_account,
 )
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError, InvalidPasswordError
-from unk029.models import AccountCreate, TopUp, Transfer, WithDraw
-
-
-class LoginRequest(BaseModel):
-    account_no: int
-    password: str
-
+from unk029.models import (
+    AccountCreate,
+    AccountUpdate,
+    CrossBankTransfer,
+    Deposit,
+    LoginRequest,
+    PayeeCreate,
+    Transfer,
+    WithDraw,
+)
 
 app = FastAPI(
     title="UNK029 Bank API",
@@ -42,7 +47,7 @@ app = FastAPI(
 @app.post("/account/login", include_in_schema=False)
 def login_endpoint(login: LoginRequest) -> Any:
     try:
-        return login_account(login.account_no, login.password)
+        return login_account(login)
     except AccountNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except InvalidPasswordError as e:
@@ -52,9 +57,55 @@ def login_endpoint(login: LoginRequest) -> Any:
 
 
 @app.post("/account/transfer")
-def transfer_account_endpoint(transfer: Transfer) -> Any:
+def transfer_account_endpoint(transfer: Transfer, x_logged_in_account: str = Header(None)) -> Any:
+    # Validate that the transfer is from the logged-in account
+    if not x_logged_in_account:
+        raise HTTPException(
+            status_code=401, detail="Authentication required. Please log in first."
+        )
+
+    if int(x_logged_in_account) != transfer.from_account_no:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"You can only transfer from your own account "
+                f"({x_logged_in_account}). Cannot transfer from "
+                f"account {transfer.from_account_no}."
+            ),
+        )
+
     try:
-        return transfer_account(transfer)
+        result = transfer_account(transfer)
+
+        # Get account names for friendly descriptions
+        from_account = get_account(transfer.from_account_no)
+        to_account = get_account(transfer.to_account_no)
+
+        # Record transaction for sender (outgoing)
+        insert_transaction(
+            account_no=transfer.from_account_no,
+            type="transfer",
+            amount=transfer.amount,
+            description=f"Transferred to account {transfer.to_account_no}, {to_account['name']}",
+            related_account_no=transfer.to_account_no,
+            direction="out",
+            status="success",
+        )
+
+        # Record transaction for receiver (incoming)
+        insert_transaction(
+            account_no=transfer.to_account_no,
+            type="transfer",
+            amount=transfer.amount,
+            description=(
+                f"Transferred from account {transfer.from_account_no}, {from_account['name']}"
+            ),
+            related_account_no=transfer.from_account_no,
+            direction="in",
+            status="success",
+        )
+
+        return result
     except AccountNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except InsufficientFundsError as e:
@@ -65,6 +116,20 @@ def transfer_account_endpoint(transfer: Transfer) -> Any:
 def get_account_endpoint(account_no: int) -> Any:
     try:
         return get_account(account_no)
+    except AccountNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@app.put("/account/{account_no}", include_in_schema=False)
+def update_account_endpoint(account_no: int, update: AccountUpdate) -> Any:
+    """Update account details (email, mobile, password)"""
+    try:
+        return update_account(
+            account_no=account_no,
+            email=update.email,
+            mobile=update.mobile,
+            password=update.password,
+        )
     except AccountNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
@@ -102,15 +167,15 @@ def create_account_endpoint(account: AccountCreate) -> Any:
     return create_account(account)
 
 
-@app.patch("/account/{account_no}/topup", include_in_schema=False)
-def topup_account_endpoint(account_no: int, topup: TopUp) -> Any:
+@app.patch("/account/{account_no}/deposit")
+def deposit_account_endpoint(account_no: int, deposit: Deposit) -> Any:
     try:
-        result = topup_account(account_no, topup)
+        result = deposit_account(account_no, deposit)
         insert_transaction(
             account_no=account_no,
             type="deposit",
-            amount=topup.amount,
-            description=f"Deposited £{topup.amount}",
+            amount=deposit.amount,
+            description=f"Deposited £{deposit.amount}",
             direction="in",
         )
         return result
@@ -118,7 +183,7 @@ def topup_account_endpoint(account_no: int, topup: TopUp) -> Any:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
-@app.patch("/account/{account_no}/withdraw", include_in_schema=False)
+@app.patch("/account/{account_no}/withdraw")
 def withdraw_account_endpoint(account_no: int, withdraw: WithDraw) -> Any:
     try:
         result = withdraw_account(account_no, withdraw)
@@ -141,10 +206,31 @@ def health() -> dict[str, str]:
     return {"message": "FastAPI is running"}
 
 
+# ============== Payee API Endpoints ==============
+
+
+@app.post("/payee", response_model=dict)
+def create_payee_endpoint(payee: PayeeCreate) -> dict[str, Any]:
+    try:
+        return add_payee(payee)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.get("/payees/{user_account_no}", response_model=list)
+def list_payees_endpoint(user_account_no: int) -> list[dict[str, Any]]:
+    try:
+        return list_payees(user_account_no)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
 # ============== Partner Banks Configuration ==============
 # Bank URLs are loaded from environment variables (set in .env file)
 URR034_BANK_URL = os.getenv("URR034_BANK_URL", "")
 UBF041_BANK_URL = os.getenv("UBF041_BANK_URL", "")
+UIA037_BANK_URL = os.getenv("UIA037_BANK_URL", "")
+USS016_BANK_URL = os.getenv("USS016_BANK_URL", "")
 
 PARTNER_BANKS = [
     {
@@ -153,44 +239,71 @@ PARTNER_BANKS = [
         "url": "/api",
         "isInternal": True,
         "transferMethod": "internal",
+        "sort_code": "11-11-11",
     },
     {
         "code": "urr034",
         "name": "Purple Bank",
         "url": URR034_BANK_URL,
         "isInternal": False,
-        # POST /transfer/?from_account_id=X&to_account_id=Y&amount=Z
-        "transferMethod": "query_params",
+        "transferMethod": "query_params",  # POST /api/deposit/?account_number&amount
+        "sort_code": "60-00-01",
     },
+    # {
+    #     "code": "uia037",
+    #     "name": "Secure Bank",
+    #     "url": UIA037_BANK_URL,
+    #     "isInternal": False,
+    #     "transferMethod": "deposit",  # POST /api/deposit with JSON body
+    #     "sort_code": "11-22-33",
+    # },
+    # {
+    #     "code": "uss016",
+    #     "name": "AppyPay",
+    #     "url": USS016_BANK_URL,
+    #     "isInternal": False,
+    #     "transferMethod": "deposit",  # POST /api/deposit with JSON body
+    #     "sort_code": "33-44-55",
+    # },
     {
         "code": "ubf041",
         "name": "Bartley Bank",
         "url": UBF041_BANK_URL,
         "isInternal": False,
-        "transferMethod": "deposit",  # POST /deposit with JSON body
+        "transferMethod": "deposit",  # POST /api/deposit with JSON body
+        "sort_code": "20-40-41",
     },
 ]
 
 
-@app.get("/banks")
+@app.get("/banks", include_in_schema=False)
 def get_partner_banks() -> list[dict[str, Any]]:
     """Get list of available banks for transfers."""
     return PARTNER_BANKS
 
 
-class CrossBankTransfer(BaseModel):
-    from_account_no: int
-    to_bank_code: str
-    to_account_no: int
-    to_sort_code: str
-    to_name: str
-    amount: float
-
-
 @app.post("/account/cross-bank-transfer")
-def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
+def cross_bank_transfer(
+    transfer: CrossBankTransfer, x_logged_in_account: str = Header(None)
+) -> Any:
     """Transfer money to another bank's account."""
     import requests  # type: ignore
+
+    # Validate that the transfer is from the logged-in account
+    if not x_logged_in_account:
+        raise HTTPException(
+            status_code=401, detail="Authentication required. Please log in first."
+        )
+
+    if int(x_logged_in_account) != transfer.from_account_no:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"You can only transfer from your own account "
+                f"({x_logged_in_account}). Cannot transfer from "
+                f"account {transfer.from_account_no}."
+            ),
+        )
 
     # Find the target bank
     target_bank = next((b for b in PARTNER_BANKS if b["code"] == transfer.to_bank_code), None)
@@ -208,11 +321,11 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
     except AccountNotFoundError as e:
         insert_transaction(
             account_no=transfer.from_account_no,
-            type="withdraw",
+            type="transfer",
             amount=transfer.amount,
             description=(
-                f"Failed: From {transfer.from_account_no} to {transfer.to_account_no} "
-                f"({transfer.to_name}) at {target_bank['name']}"
+                f"Failed transfer to {transfer.to_name}, account {transfer.to_account_no} "
+                f"at {target_bank['name']}: Account not found"
             ),
             related_account_no=transfer.to_account_no,
             direction="out",
@@ -222,11 +335,11 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
     except InsufficientFundsError as e:
         insert_transaction(
             account_no=transfer.from_account_no,
-            type="withdraw",
+            type="transfer",
             amount=transfer.amount,
             description=(
-                f"Failed: From {transfer.from_account_no} to {transfer.to_account_no} "
-                f"({transfer.to_name}) at {target_bank['name']}"
+                f"Failed transfer to {transfer.to_name}, account {transfer.to_account_no} "
+                f"at {target_bank['name']}: Insufficient funds"
             ),
             related_account_no=transfer.to_account_no,
             direction="out",
@@ -236,24 +349,25 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
 
     # Then deposit to external bank
     try:
-        bank_url = target_bank["url"]
-        method = target_bank["transferMethod"]
+        bank_url = str(target_bank["url"])
+        method = str(target_bank["transferMethod"])
 
         if method == "query_params":
-            # URR034 style: POST /transfer/?to_account_id=Y&amount=Z
-            # (omit from_account_id for cross-bank)
+            # URR034 (Purple Bank): POST {base_api}/deposit/ with query parameters
             response = requests.post(
-                f"{bank_url}/transfer/",
+                f"{bank_url.rstrip('/')}/deposit/",
                 params={
-                    "to_account_id": transfer.to_account_no,
+                    "account_number": str(transfer.to_account_no),
                     "amount": transfer.amount,
                 },
                 timeout=30,
+                verify=False,
+                allow_redirects=True,
             )
         elif method == "deposit":
-            # UBF041 style: POST /deposit with JSON body
+            # UBF041 style: POST {base_api}/deposit with JSON body
             response = requests.post(
-                f"{bank_url}/deposit",
+                f"{bank_url.rstrip('/')}/deposit",
                 json={
                     "account_number": str(transfer.to_account_no),
                     "sort_code": transfer.to_sort_code,
@@ -264,12 +378,15 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
             )
         else:
             # Refund on unknown method
-            topup_account(transfer.from_account_no, TopUp(amount=transfer.amount))
+            deposit_account(transfer.from_account_no, Deposit(amount=transfer.amount))
             insert_transaction(
                 account_no=transfer.from_account_no,
-                type="withdraw",
+                type="transfer",
                 amount=transfer.amount,
-                description=f"Cross-bank transfer failed: unsupported method {method}",
+                description=(
+                    f"Failed transfer to {transfer.to_name} at "
+                    f"{target_bank['name']}: Unsupported transfer method"
+                ),
                 related_account_no=transfer.to_account_no,
                 direction="out",
                 status="fail",
@@ -278,7 +395,7 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
 
         if not response.ok:
             # Refund on failure
-            topup_account(transfer.from_account_no, TopUp(amount=transfer.amount))
+            deposit_account(transfer.from_account_no, Deposit(amount=transfer.amount))
             error_detail = (
                 response.json().get("detail", response.text)
                 if response.text
@@ -286,11 +403,11 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
             )
             insert_transaction(
                 account_no=transfer.from_account_no,
-                type="withdraw",
+                type="transfer",
                 amount=transfer.amount,
                 description=(
-                    f"Failed: From {transfer.from_account_no} to {transfer.to_account_no} "
-                    f"({transfer.to_name}) at {target_bank['name']} - {error_detail}"
+                    f"Failed transfer to {transfer.to_name}, account {transfer.to_account_no} "
+                    f"at {target_bank['name']}: {error_detail}"
                 ),
                 related_account_no=transfer.to_account_no,
                 direction="out",
@@ -303,11 +420,11 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
         # Success
         insert_transaction(
             account_no=transfer.from_account_no,
-            type="withdraw",
+            type="transfer",
             amount=transfer.amount,
             description=(
-                f"From {transfer.from_account_no} to {transfer.to_account_no} "
-                f"({transfer.to_name}) at {target_bank['name']}"
+                f"Transferred £{transfer.amount} to {transfer.to_name}, "
+                f"account {transfer.to_account_no} at {target_bank['name']}"
             ),
             related_account_no=transfer.to_account_no,
             direction="out",
@@ -325,7 +442,7 @@ def cross_bank_transfer(transfer: CrossBankTransfer) -> Any:
 
     except requests.RequestException as e:
         # Refund on network error
-        topup_account(transfer.from_account_no, TopUp(amount=transfer.amount))
+        deposit_account(transfer.from_account_no, Deposit(amount=transfer.amount))
         insert_transaction(
             account_no=transfer.from_account_no,
             type="withdraw",

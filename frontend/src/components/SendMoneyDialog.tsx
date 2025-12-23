@@ -12,6 +12,7 @@ interface Bank {
   url: string | null;
   isInternal: boolean;
   transferMethod: string;
+  sort_code?: string;
 }
 
 interface SendMoneyDialogProps {
@@ -82,6 +83,13 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
   const amountInGBP = parseFloat(amount) / EXCHANGE_RATES[currency] || 0;
   const isInternalTransfer = selectedBank === 'unk029';
   const selectedBankInfo = banks.find(b => b.code === selectedBank);
+
+  // Auto-populate sort code when bank is selected
+  useEffect(() => {
+    if (selectedBankInfo && selectedBankInfo.sort_code) {
+      setSortCode(selectedBankInfo.sort_code);
+    }
+  }, [selectedBank, selectedBankInfo]);
 
   const formatSortCode = (value: string): string => {
     const digits = value.replace(/\D/g, '').slice(0, 6);
@@ -210,6 +218,7 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-Logged-In-Account': fromAccount,
           },
           body: JSON.stringify({
             from_account_no: parseInt(fromAccount),
@@ -234,6 +243,7 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-Logged-In-Account': fromAccount,
           },
           body: JSON.stringify({
             from_account_no: parseInt(fromAccount),
@@ -340,11 +350,16 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
                     value={sortCode}
                     onChange={handleSortCodeChange}
                     maxLength={8}
+                    readOnly={isInternalTransfer}
+                    className={isInternalTransfer ? 'bg-muted cursor-not-allowed' : ''}
                   />
-                  {sortCodeError && (
+                  {isInternalTransfer && (
+                    <p className="text-xs text-blue-600">ℹ️ Auto-filled for UNK Bank</p>
+                  )}
+                  {!isInternalTransfer && sortCodeError && (
                     <p className="text-xs text-red-600">{sortCodeError}</p>
                   )}
-                  {!sortCodeError && sortCode && (
+                  {!isInternalTransfer && !sortCodeError && sortCode && (
                     <p className="text-xs text-green-600">✓ Format valid</p>
                   )}
                 </div>
@@ -423,6 +438,12 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
                   <div className="flex justify-between items-center border-b pb-2 mb-2">
                     <span className="text-muted-foreground">Bank</span>
                     <span className="font-medium text-amber-600">{selectedBankInfo?.name}</span>
+                  </div>
+                )}
+                {isInternalTransfer && (
+                  <div className="flex justify-between items-center border-b pb-2 mb-2">
+                    <span className="text-muted-foreground">Bank</span>
+                    <span className="font-medium text-green-600">{selectedBankInfo?.name}</span>
                   </div>
                 )}
                 <div className="flex justify-between">

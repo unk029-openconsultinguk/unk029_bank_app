@@ -103,13 +103,13 @@ const DashboardHeader = ({ userName, onLogout, onOpenChat, onOpenAccounts, onOpe
 
           {/* TSB-Style Logo */}
           <div className="flex items-center gap-0 ml-1">
-            <div className="w-9 h-9 bg-sky-400 rounded-full flex items-center justify-center text-white font-bold text-sm font-sans" style={{marginLeft: '0'}}>
+            <div className="w-9 h-9 bg-sky-400 flex items-center justify-center text-white font-bold text-sm font-sans" style={{marginLeft: '0', clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'}}>
               U
             </div>
-            <div className="w-9 h-9 bg-sky-600 rounded-full flex items-center justify-center text-white font-bold text-sm font-sans" style={{marginLeft: '-10px'}}>
+            <div className="w-9 h-9 bg-sky-600 flex items-center justify-center text-white font-bold text-sm font-sans" style={{marginLeft: '-10px', clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'}}>
               N
             </div>
-            <div className="w-9 h-9 bg-blue-900 rounded-full flex items-center justify-center text-white font-bold text-sm font-sans" style={{marginLeft: '-10px'}}>
+            <div className="w-9 h-9 bg-blue-900 flex items-center justify-center text-white font-bold text-sm font-sans" style={{marginLeft: '-10px', clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'}}>
               K
             </div>
           </div>

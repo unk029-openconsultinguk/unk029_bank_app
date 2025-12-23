@@ -6,18 +6,20 @@ from unk029.database import (
     get_transactions,
     insert_transaction,
     login_account,
+    update_account,
 )
 from unk029.exceptions import AccountError, AccountNotFoundError, InsufficientFundsError
-from unk029.models import Account, AccountCreate, TopUp, WithDraw
+from unk029.models import Account, AccountCreate, AccountUpdate, Deposit, WithDraw
 
 __all__ = [
     "Account",
     "AccountCreate",
     "AccountError",
     "AccountNotFoundError",
+    "AccountUpdate",
     "DatabaseConfig",
+    "Deposit",
     "InsufficientFundsError",
-    "TopUp",
     "WithDraw",
     "__version__",
     "get_connection",
@@ -25,4 +27,5 @@ __all__ = [
     "get_transactions",
     "insert_transaction",
     "login_account",
+    "update_account",
 ]

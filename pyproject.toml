@@ -1,6 +1,6 @@
 [project]
-name = "unk029_bank_app"
-# version = "1.0.0"
+name = "unk029"
+# version = "0.1.5"
 dynamic = ["version"]
 description = "UNK029 Banking Library - Reusable banking operations with Oracle database support"
 authors = [

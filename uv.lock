@@ -6,9 +6,6 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 
-[options]
-prerelease-mode = "allow"
-
 [[package]]
 name = "aiosqlite"
 version = "0.22.0"
@@ -2781,7 +2778,8 @@ wheels = [
 ]
 
 [[package]]
-name = "unk029-bank-app"
+name = "unk029"
+version = "0.1.5"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },

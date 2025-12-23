@@ -6,8 +6,8 @@ from unk029 import (
     Account,
     AccountCreate,
     AccountNotFoundError,
+    Deposit,
     InsufficientFundsError,
-    TopUp,
     WithDraw,
 )
 from unk029.database import DatabaseConfig
@@ -17,25 +17,26 @@ def test_account_create_model() -> None:
     """Test AccountCreate model creation."""
     account = AccountCreate(
         name="John Doe",
-        balance=100.0,
+        email="john@example.com",
         password="secret123",
     )
     assert account.name == "John Doe"
-    assert account.balance == 100.0
+    assert account.email == "john@example.com"
     assert account.password == "secret123"
 
 
-def test_account_create_default_balance() -> None:
-    """Test AccountCreate model with default balance."""
-    account = AccountCreate(name="Jane Doe", password="pass123")
+def test_account_create_required_fields() -> None:
+    """Test AccountCreate model with all required fields."""
+    account = AccountCreate(name="Jane Doe", email="jane@example.com", password="pass123")
     assert account.name == "Jane Doe"
-    assert account.balance == 0.0
+    assert account.email == "jane@example.com"
+    assert account.password == "pass123"
 
 
-def test_topup_model() -> None:
-    """Test TopUp model creation."""
-    topup = TopUp(amount=50.0)
-    assert topup.amount == 50.0
+def test_deposit_model() -> None:
+    """Test Deposit model creation."""
+    deposit = Deposit(amount=50.0)
+    assert deposit.amount == 50.0
 
 
 def test_withdraw_model() -> None:

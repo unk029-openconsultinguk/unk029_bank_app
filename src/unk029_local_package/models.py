@@ -10,12 +10,11 @@ class AccountCreate(BaseModel):
     """Model for creating a new account."""
 
     name: str
-    balance: float = 0.0
+    email: str
     password: str
-    sortcode: str = "00-00-00"
 
 
-class TopUp(BaseModel):
+class Deposit(BaseModel):
     """Model for deposit operation."""
 
     amount: float
@@ -25,6 +24,12 @@ class WithDraw(BaseModel):
     """Model for withdrawal operation."""
 
     amount: float
+
+
+class LoginRequest(BaseModel):
+    account_no: int | None = None
+    email: str | None = None
+    password: str
 
 
 class Account(BaseModel):
@@ -42,3 +47,38 @@ class Transfer(BaseModel):
     from_account_no: int
     to_account_no: int
     amount: float
+
+
+class CrossBankTransfer(BaseModel):
+    """Model for cross-bank transfer to external banks."""
+
+    from_account_no: int
+    to_bank_code: str
+    to_account_no: int
+    to_sort_code: str
+    to_name: str
+    amount: float
+
+
+class PayeeCreate(BaseModel):
+    user_account_no: int
+    payee_name: str
+    payee_account_no: int
+    payee_sort_code: str
+
+
+class Payee(BaseModel):
+    id: int
+    user_account_no: int
+    payee_name: str
+    payee_account_no: int
+    payee_sort_code: str
+    created_at: str
+
+
+class AccountUpdate(BaseModel):
+    """Model for updating account details."""
+
+    email: str | None = None
+    mobile: str | None = None
+    password: str | None = None
