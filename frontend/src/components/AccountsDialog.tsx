@@ -42,7 +42,7 @@ const AccountsDialog = ({ isOpen, onOpenChange, userName }: AccountsDialogProps)
       setFetching(true);
       const accountNo = localStorage.getItem('account_number');
       if (accountNo) {
-        fetch(`/account/${accountNo}`)
+        fetch(`/api/account/${accountNo}`)
           .then(res => res.json())
           .then(data => {
             setFullName(data.name || userName);
@@ -118,7 +118,7 @@ const AccountsDialog = ({ isOpen, onOpenChange, userName }: AccountsDialogProps)
         payload.password = newPassword;
       }
 
-      const response = await fetch(`/account/${accountNo}`, {
+      const response = await fetch(`/api/account/${accountNo}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -307,8 +307,10 @@ const AIChatPanel = ({ isOpen, onClose, accountNo }: AIChatPanelProps) => {
         <SheetContent side="right" className="w-full sm:w-[500px] p-0 flex flex-col shadow-lg border-l border-gray-200">
           <SheetHeader className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
             <SheetTitle className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
-                <Bot className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-0">
+                <div className="w-8 h-8 bg-sky-400 flex items-center justify-center text-white font-bold text-xs shadow-md" style={{clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'}}>U</div>
+                  <div className="w-8 h-8 bg-sky-600 flex items-center justify-center text-white font-bold text-xs shadow-md" style={{marginLeft: '-8px', clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'}}>N</div>
+                  <div className="w-8 h-8 bg-blue-900 flex items-center justify-center text-white font-bold text-xs shadow-md" style={{marginLeft: '-8px', clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'}}>K</div>
               </div>
               <span className="text-lg font-bold text-blue-900">Banking Assistant</span>
             </SheetTitle>
@@ -325,8 +327,10 @@ const AIChatPanel = ({ isOpen, onClose, accountNo }: AIChatPanelProps) => {
                   className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {message.role === 'assistant' && (
-                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-                      <Bot className="w-4 h-4 text-white" />
+                    <div className="flex items-center gap-0 flex-shrink-0">
+                      <div className="w-6 h-6 bg-sky-400 flex items-center justify-center text-white font-bold text-[10px] shadow-md" style={{clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'}}>U</div>
+                      <div className="w-6 h-6 bg-sky-600 flex items-center justify-center text-white font-bold text-[10px] shadow-md" style={{marginLeft: '-6px', clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'}}>N</div>
+                      <div className="w-6 h-6 bg-blue-900 flex items-center justify-center text-white font-bold text-[10px] shadow-md" style={{marginLeft: '-6px', clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'}}>K</div>
                     </div>
                   )}
                   <div

@@ -29,29 +29,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }, []);
 
-  const login = async (accountNumber: string, password: string) => {
+  const login = async (loginId: string, password: string) => {
     try {
-      // Call FastAPI backend to authenticate with password
+      // Determine if loginId is an email or account number
+      const isEmail = loginId.includes('@');
+      const payload = isEmail
+        ? { email: loginId, password }
+        : { account_no: parseInt(loginId), password };
       const response = await fetch('/api/account/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          account_no: parseInt(accountNumber),
-          password: password,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Invalid account number or password');
+        let errorMsg = 'Invalid account number or password';
+        try {
+          const errorData = await response.json();
+          if (errorData.detail) {
+            if (errorData.detail === 'Invalid password') {
+              errorMsg = 'Incorrect password. Please try again.';
+            } else if (errorData.detail.includes('not found')) {
+              errorMsg = 'Account number not found.';
+            } else {
+              errorMsg = errorData.detail;
+            }
+          }
+        } catch {}
+        throw new Error(errorMsg);
       }
 
       const accountData = await response.json();
 
       const user: User = {
-        id: accountNumber,
+        id: accountData.account_no.toString(),
         accountNumber: accountData.account_no.toString(),
         sortCode: accountData.sortcode || '00-00-00',
         name: accountData.account_name || accountData.name || 'User',
@@ -60,12 +73,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Store authentication info
       setUser(user);
       localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('account_number', accountNumber);
+      localStorage.setItem('account_number', accountData.account_no.toString());
       localStorage.setItem('password', password);
-      localStorage.setItem('auth_token', `token_${accountNumber}`);
-    } catch (error) {
+      localStorage.setItem('auth_token', `token_${accountData.account_no}`);
+    } catch (error: any) {
       console.error('Login failed:', error);
-      throw new Error('Authentication failed. Please check your credentials.');
+      throw new Error(error.message || 'Authentication failed. Please check your credentials.');
     }
   };
 

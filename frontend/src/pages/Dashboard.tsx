@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { toast } from '@/hooks/use-toast';
 import BalanceCard from '@/components/BalanceCard';
 import TransactionList from '@/components/TransactionList';
 import QuickActions from '@/components/QuickActions';
@@ -68,15 +69,29 @@ const Dashboard = () => {
           const txData = await txResp.json();
           // Map backend transactions to frontend Transaction type
           setTransactions(
-            (txData.transactions || []).map((t: any) => ({
-              id: t.id?.toString() ?? '',
-              type: t.type,
-              amount: t.amount,
-              date: t.created_at,
-              description: t.description,
-              status: t.status,
-              related_account_no: t.related_account_no,
-            }))
+            (txData.transactions || []).map((t: any) => {
+              // Determine display type based on transaction type and direction
+              let displayType: 'deposit' | 'withdraw' = 'deposit';
+              
+              if (t.type === 'deposit') {
+                displayType = 'deposit';
+              } else if (t.type === 'withdraw') {
+                displayType = 'withdraw';
+              } else if (t.type === 'transfer') {
+                // For transfers, use direction: "in" = deposit, "out" = withdraw
+                displayType = t.direction === 'in' ? 'deposit' : 'withdraw';
+              }
+              
+              return {
+                id: t.id?.toString() ?? '',
+                type: displayType,
+                amount: t.amount,
+                date: t.created_at,
+                description: t.description,
+                status: t.status,
+                related_account_no: t.related_account_no,
+              };
+            })
           );
         }
       } catch (error) {
@@ -165,7 +180,7 @@ const Dashboard = () => {
     return true;
   };
 
-  const handleSendMoney = async (amount: number, recipient: string) => {
+  const handleSendMoney = async (amount: number, recipient: string, currency?: string) => {
     if (amount > balance) {
       toast({
         title: "Insufficient Funds",
@@ -186,9 +201,9 @@ const Dashboard = () => {
         id: Date.now().toString(), 
         type: 'deposit', 
         amount, 
-        date: new Date(), 
+        date: new Date().toISOString(), 
         description: method 
-      },
+      } as Transaction,
       ...prev
     ]);
   };
@@ -208,96 +223,124 @@ const Dashboard = () => {
         id: Date.now().toString(), 
         type: 'withdraw', 
         amount, 
-        date: new Date(), 
+        date: new Date().toISOString(), 
         description: `${billType} Bill Payment` 
-      },
+      } as Transaction,
       ...prev
     ]);
     return true;
   };
 
-  const handleAddPayee = (payee: { name: string; sortCode: string; accountNumber: string }) => {
-    toast({
-      title: "Payee Added",
-      description: `${payee.name} has been saved to your payees.`,
-    });
+  const handleAddPayee = async (payee: { name: string; sortCode: string; accountNumber: string }) => {
+    if (!user?.accountNumber) {
+      toast({ title: "Error", description: "User not logged in.", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch('/api/payee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_account_no: user.accountNumber,
+          payee_name: payee.name,
+          payee_account_no: payee.accountNumber,
+          payee_sort_code: payee.sortCode,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast({
+        title: "Payee Added",
+        description: `${payee.name} has been saved to your payees.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error Adding Payee",
+        description: err.message || 'Failed to add payee',
+        variant: "destructive",
+      });
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
-      <DashboardHeader 
-        userName={user?.name || 'User'} 
-        onLogout={handleLogout}
-        onOpenChat={() => setChatOpen(true)}
-        onOpenAccounts={() => setAccountsOpen(true)}
-        onOpenTransfer={() => setSendMoneyOpen(true)}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
+    return (
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+          <DashboardHeader 
+            userName={user?.name || 'User'} 
+            onLogout={handleLogout}
+            onOpenChat={() => setChatOpen(true)}
+            onOpenAccounts={() => setAccountsOpen(true)}
+            onOpenTransfer={() => setSendMoneyOpen(true)}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <BalanceCard 
-            balance={balance} 
-            accountNumber={user?.accountNumber || '00000000'}
-            sortCode={user?.sortCode || '00-00-00'}
+          {/* Main Content */}
+          <main className="container mx-auto px-4 py-8">
+            <div className="max-w-4xl mx-auto space-y-6">
+              <BalanceCard 
+                balance={balance} 
+                accountNumber={user?.accountNumber || '00000000'}
+                sortCode={user?.sortCode || '00-00-00'}
+              />
+              <QuickActions 
+                onSendMoney={() => setSendMoneyOpen(true)}
+                onAddMoney={() => setAddMoneyOpen(true)}
+                onPayBill={() => setPayBillOpen(true)}
+                onNewPayee={() => setNewPayeeOpen(true)}
+              />
+              <TransactionList transactions={transactions} />
+            </div>
+          </main>
+
+          {/* Floating Chat Button */}
+          <FloatingChatButton onClick={() => setChatOpen(true)} />
+
+          {/* AI Chat Panel */}
+          <AIChatPanel 
+            isOpen={chatOpen}
+            onClose={() => setChatOpen(false)}
+            accountNo={accountNumber}
           />
-          <QuickActions 
-            onSendMoney={() => setSendMoneyOpen(true)}
-            onAddMoney={() => setAddMoneyOpen(true)}
-            onPayBill={() => setPayBillOpen(true)}
-            onNewPayee={() => setNewPayeeOpen(true)}
+
+          {/* Header Dialogs */}
+          <AccountsDialog
+            isOpen={accountsOpen}
+            onOpenChange={setAccountsOpen}
+            userName={user?.name || 'User'}
           />
-          <TransactionList transactions={transactions} />
+          <SettingsDialog
+            isOpen={settingsOpen}
+            onOpenChange={setSettingsOpen}
+          />
+
+          {/* Action Dialogs */}
+          <SendMoneyDialog
+            isOpen={sendMoneyOpen}
+            onClose={() => setSendMoneyOpen(false)}
+            currentBalance={balance}
+            onSend={handleSendMoney}
+          />
+          <AddMoneyDialog
+            isOpen={addMoneyOpen}
+            onClose={() => setAddMoneyOpen(false)}
+            onAdd={handleAddMoney}
+          />
+          <PayBillDialog
+            isOpen={payBillOpen}
+            onClose={() => setPayBillOpen(false)}
+            currentBalance={balance}
+            onPay={handlePayBill}
+          />
+          <NewPayeeDialog
+            isOpen={newPayeeOpen}
+            onClose={() => setNewPayeeOpen(false)}
+            onAdd={handleAddPayee}
+          />
         </div>
-      </main>
-
-      {/* Floating Chat Button */}
-      <FloatingChatButton onClick={() => setChatOpen(true)} />
-
-      {/* AI Chat Panel */}
-      <AIChatPanel 
-        isOpen={chatOpen}
-        onClose={() => setChatOpen(false)}
-        accountNo={accountNumber}
-      />
-
-      {/* Header Dialogs */}
-      <AccountsDialog
-        isOpen={accountsOpen}
-        onOpenChange={setAccountsOpen}
-        userName={user?.name || 'User'}
-      />
-      <SettingsDialog
-        isOpen={settingsOpen}
-        onOpenChange={setSettingsOpen}
-      />
-
-      {/* Action Dialogs */}
-      <SendMoneyDialog
-        isOpen={sendMoneyOpen}
-        onClose={() => setSendMoneyOpen(false)}
-        currentBalance={balance}
-        onSend={handleSendMoney}
-      />
-      <AddMoneyDialog
-        isOpen={addMoneyOpen}
-        onClose={() => setAddMoneyOpen(false)}
-        onAdd={handleAddMoney}
-      />
-      <PayBillDialog
-        isOpen={payBillOpen}
-        onClose={() => setPayBillOpen(false)}
-        currentBalance={balance}
-        onPay={handlePayBill}
-      />
-      <NewPayeeDialog
-        isOpen={newPayeeOpen}
-        onClose={() => setNewPayeeOpen(false)}
-        onAdd={handleAddPayee}
-      />
-    </div>
-  );
+        <footer className="w-full text-center text-xs text-gray-400 py-2 bg-white border-t border-gray-200 fixed bottom-0 left-0 z-50">
+          © {new Date().getFullYear()} UNK Bank. All rights reserved.
+        </footer>
+      </>
+    );
 };
 
 export default Dashboard;
