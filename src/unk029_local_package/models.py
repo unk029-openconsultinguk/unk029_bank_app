@@ -49,15 +49,14 @@ class Transfer(BaseModel):
     amount: float
 
 
-class CrossBankTransfer(BaseModel):
-    """Model for cross-bank transfer to external banks."""
+class UniversalTransfer(BaseModel):
+    """Unified model for both internal and external transfers."""
 
     from_account_no: int
-    to_bank_code: str
     to_account_no: int
-    to_sort_code: str
-    to_name: str
     amount: float
+    to_sort_code: str | None = None
+    to_name: str | None = "Recipient"
 
 
 class PayeeCreate(BaseModel):

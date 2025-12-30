@@ -61,6 +61,8 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
   const [detectedBank, setDetectedBank] = useState<Bank | null>(null);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [loading, setLoading] = useState(false);
+  const [payees, setPayees] = useState<any[]>([]);
+  const [selectedPayeeId, setSelectedPayeeId] = useState<string>('');
 
   // Fetch available banks on mount
   useEffect(() => {
@@ -80,6 +82,26 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
     fetchBanks();
   }, []);
 
+  // Fetch payees when dialog opens
+  useEffect(() => {
+    const fetchPayees = async () => {
+      const fromAccount = localStorage.getItem('account_number');
+      if (!fromAccount) return;
+      try {
+        const response = await fetch(`/api/payees/${fromAccount}`);
+        if (response.ok) {
+          const data = await response.json();
+          setPayees(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch payees:', err);
+      }
+    };
+    if (isOpen) {
+      fetchPayees();
+    }
+  }, [isOpen]);
+
   const amountInGBP = parseFloat(amount) / EXCHANGE_RATES[currency] || 0;
   const isInternalTransfer = detectedBank?.code === 'unk029';
   const selectedBankInfo = detectedBank;
@@ -90,6 +112,25 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
     if (digits.length <= 2) return digits;
     if (digits.length <= 4) return digits.slice(0, 2) + '-' + digits.slice(2);
     return digits.slice(0, 2) + '-' + digits.slice(2, 4) + '-' + digits.slice(4, 6);
+  };
+
+  const handlePayeeSelect = (payeeId: string) => {
+    setSelectedPayeeId(payeeId);
+    const payee = payees.find(p => p.id.toString() === payeeId);
+    if (payee) {
+      setRecipient(payee.payee_name);
+      setAccountNumber(payee.payee_account_no.toString());
+      
+      // Format sort code
+      const sc = payee.payee_sort_code.toString();
+      const formattedSC = formatSortCode(sc);
+      setSortCode(formattedSC);
+      
+      // Detect bank based on sort code
+      const bank = banks.find(b => b.sort_code === formattedSC);
+      setDetectedBank(bank || null);
+      setError('');
+    }
   };
 
   const validateForm = async (): Promise<string | null> => {
@@ -217,59 +258,31 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
         return;
       }
 
-      if (isInternalTransfer) {
-        // Internal transfer within UNK029 bank
-        const response = await fetch('/api/account/transfer', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Logged-In-Account': fromAccount,
-          },
-          body: JSON.stringify({
-            from_account_no: parseInt(fromAccount),
-            to_account_no: parseInt(accountNumber),
-            amount: amountInGBP,
-          }),
-        });
+      // Use the universal transfer endpoint for both internal and external
+      const response = await fetch('/api/account/transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Logged-In-Account': fromAccount,
+        },
+        body: JSON.stringify({
+          from_account_no: parseInt(fromAccount),
+          to_account_no: parseInt(accountNumber),
+          amount: amountInGBP,
+          to_sort_code: sortCode.replace(/-/g, ''),
+          to_name: recipient,
+        }),
+      });
 
-        if (response.ok) {
-          setError('');
-          setStep('success');
-          onSend(amountInGBP, recipient, currency);
-        } else {
-          const errorResponse = await response.json();
-          const userFriendlyError = getErrorMessage(errorResponse);
-          setError(userFriendlyError);
-          setStep('form');
-        }
+      if (response.ok) {
+        setError('');
+        setStep('success');
+        onSend(amountInGBP, recipient, currency);
       } else {
-        // Cross-bank transfer - use the cross-bank transfer endpoint
-        const response = await fetch('/api/account/cross-bank-transfer', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Logged-In-Account': fromAccount,
-          },
-          body: JSON.stringify({
-            from_account_no: parseInt(fromAccount),
-            to_bank_code: detectedBank?.code,
-            to_account_no: parseInt(accountNumber),
-            to_sort_code: sortCode.replace(/-/g, ''),
-            to_name: recipient,
-            amount: amountInGBP,
-          }),
-        });
-
-        if (response.ok) {
-          setError('');
-          setStep('success');
-          onSend(amountInGBP, recipient, currency);
-        } else {
-          const errorResponse = await response.json();
-          const userFriendlyError = getErrorMessage(errorResponse);
-          setError(userFriendlyError);
-          setStep('form');
-        }
+        const errorResponse = await response.json();
+        const userFriendlyError = getErrorMessage(errorResponse);
+        setError(userFriendlyError);
+        setStep('form');
       }
     } catch (error) {
       console.error('Transfer error:', error);
@@ -291,6 +304,7 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
     setError('');
     setSortCodeError('');
     setDetectedBank(null);
+    setSelectedPayeeId('');
     onClose();
   };
 
@@ -315,6 +329,23 @@ const SendMoneyDialog = ({ isOpen, onClose, currentBalance, onSend }: SendMoneyD
               </div>
             )}
             <div className="space-y-4 py-4">
+              {payees.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Select Saved Payee</Label>
+                  <Select value={selectedPayeeId} onValueChange={handlePayeeSelect}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a payee..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {payees.map((p) => (
+                        <SelectItem key={p.id} value={p.id.toString()}>
+                          {p.payee_name} ({p.payee_sort_code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Recipient Name</Label>
                 <Input

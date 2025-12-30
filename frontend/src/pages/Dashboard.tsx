@@ -234,7 +234,7 @@ const Dashboard = () => {
   const handleAddPayee = async (payee: { name: string; sortCode: string; accountNumber: string }) => {
     if (!user?.accountNumber) {
       toast({ title: "Error", description: "User not logged in.", variant: "destructive" });
-      return;
+      return false;
     }
     try {
       const res = await fetch('/api/payee', {
@@ -252,12 +252,14 @@ const Dashboard = () => {
         title: "Payee Added",
         description: `${payee.name} has been saved to your payees.`,
       });
+      return true;
     } catch (err: any) {
       toast({
         title: "Error Adding Payee",
         description: err.message || 'Failed to add payee',
         variant: "destructive",
       });
+      return false;
     }
   };
 
