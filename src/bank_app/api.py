@@ -17,7 +17,11 @@ from unk029.database import (
     update_account,
     withdraw_account,
 )
-from unk029_local_package.banks import EXTERNAL_BANKS, INTERNAL_BANK
+from unk029_local_package.banks import (
+    get_external_banks,
+    get_internal_bank,
+    discover_deposit_endpoint,
+)
 from unk029.exceptions import AccountNotFoundError, InsufficientFundsError, InvalidPasswordError
 from unk029.models import (
     AccountCreate,
@@ -226,7 +230,7 @@ def list_payees_endpoint(user_account_no: int) -> list[dict[str, Any]]:
 @app.get("/banks", include_in_schema=False)
 def get_partner_banks() -> list[dict[str, Any]]:
     """Get list of available banks for transfers."""
-    return [INTERNAL_BANK] + EXTERNAL_BANKS
+    return [get_internal_bank()] + get_external_banks()
 
 
 @app.post("/account/cross-bank-transfer")
@@ -253,7 +257,7 @@ def cross_bank_transfer(
         )
 
     # Find the target bank
-    target_bank = next((b for b in EXTERNAL_BANKS if b["code"] == transfer.to_bank_code), None)
+    target_bank = next((b for b in get_external_banks() if b["code"] == transfer.to_bank_code), None)
     if not target_bank:
         raise HTTPException(status_code=400, detail=f"Unknown bank: {transfer.to_bank_code}")
 
@@ -296,13 +300,31 @@ def cross_bank_transfer(
 
     # Then deposit to external bank
     try:
-        bank_url = str(target_bank["url"])
+        bank_url = str(target_bank["url"]).rstrip("/")
         method = str(target_bank["transferMethod"])
+        
+        # DYNAMIC DISCOVERY: If endpoint is not defined, try to find it
+        endpoint = target_bank.get("endpoint")
+        if not endpoint:
+            endpoint, discovered_method = discover_deposit_endpoint(bank_url)
+            # Cache it in the current session's bank object
+            target_bank["endpoint"] = endpoint
+            # If the bank didn't have a method, use the discovered one
+            if method == "deposit": # "deposit" is our generic label for JSON body transfers
+                method = discovered_method
+            
+        # Handle path parameters like {account_id} or {account_number}
+        endpoint = endpoint.replace("{account_id}", str(transfer.to_account_no))
+        endpoint = endpoint.replace("{account_number}", str(transfer.to_account_no))
+        endpoint = endpoint.replace("{id}", str(transfer.to_account_no))
+        endpoint = endpoint.replace("{accountNo}", str(transfer.to_account_no))
+            
+        full_url = f"{bank_url}{endpoint}"
 
         if method == "query_params":
             # URR034 (Purple Bank): POST {base_api}/deposit/ with query parameters
             response = requests.post(
-                f"{bank_url.rstrip('/')}/deposit/",
+                full_url,
                 params={
                     "account_number": str(transfer.to_account_no),
                     "amount": transfer.amount,
@@ -311,17 +333,25 @@ def cross_bank_transfer(
                 verify=False,
                 allow_redirects=True,
             )
-        elif method == "deposit":
-            # UBF041 style: POST {base_api}/deposit with JSON body
-            response = requests.post(
-                f"{bank_url.rstrip('/')}/deposit",
+        elif method in ["deposit", "post", "patch", "put"]:
+            # JSON body style (UBF041, Secure Bank, etc.)
+            # Use the specific method if discovered, otherwise default to POST
+            http_method = method if method in ["post", "patch", "put"] else "post"
+            
+            response = requests.request(
+                http_method,
+                full_url,
                 json={
                     "account_number": str(transfer.to_account_no),
                     "sort_code": transfer.to_sort_code,
                     "account_holder": transfer.to_name,
                     "amount": transfer.amount,
+                    "description": f"Transfer from {get_internal_bank()['name']}",
+                    "from_account_number": str(transfer.from_account_no),
+                    "from_sort_code": get_internal_bank()["sort_code"],
                 },
                 timeout=30,
+                verify=False,
             )
         else:
             # Refund on unknown method
@@ -348,14 +378,18 @@ def cross_bank_transfer(
                 if response.text
                 else "External bank error"
             )
+            
+            # Truncate description to 255 chars to avoid ORA-12899
+            description = (
+                f"Failed transfer to {transfer.to_name}, account {transfer.to_account_no} "
+                f"at {target_bank['name']}: {error_detail}"
+            )[:255]
+            
             insert_transaction(
                 account_no=transfer.from_account_no,
                 type="transfer",
                 amount=transfer.amount,
-                description=(
-                    f"Failed transfer to {transfer.to_name}, account {transfer.to_account_no} "
-                    f"at {target_bank['name']}: {error_detail}"
-                ),
+                description=description,
                 related_account_no=transfer.to_account_no,
                 direction="out",
                 status="fail",
