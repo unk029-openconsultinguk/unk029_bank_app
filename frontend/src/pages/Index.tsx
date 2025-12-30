@@ -20,7 +20,14 @@ const Index = () => {
   const [error, setError] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    if (name === 'name') {
+      // Only allow letters and spaces
+      const filteredValue = value.replace(/[^a-zA-Z\s]/g, '');
+      setForm({ ...form, [name]: filteredValue });
+    } else {
+      setForm({ ...form, [name]: value });
+    }
   }
 
   const validatePassword = (password: string) => {

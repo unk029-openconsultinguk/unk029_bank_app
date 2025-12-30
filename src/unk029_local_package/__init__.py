@@ -1,5 +1,5 @@
-from unk029.__about__ import __version__
-from unk029.database import (
+from .__about__ import __version__
+from .database import (
     DatabaseConfig,
     get_connection,
     get_cursor,
@@ -8,8 +8,8 @@ from unk029.database import (
     login_account,
     update_account,
 )
-from unk029.exceptions import AccountError, AccountNotFoundError, InsufficientFundsError
-from unk029.models import Account, AccountCreate, AccountUpdate, Deposit, WithDraw
+from .exceptions import AccountError, AccountNotFoundError, InsufficientFundsError
+from .models import Account, AccountCreate, AccountUpdate, Deposit, WithDraw
 
 __all__ = [
     "Account",

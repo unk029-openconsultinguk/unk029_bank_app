@@ -8,7 +8,7 @@ import { CheckCircle2, UserPlus } from 'lucide-react';
 interface NewPayeeDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (payee: { name: string; sortCode: string; accountNumber: string }) => void;
+  onAdd: (payee: { name: string; sortCode: string; accountNumber: string }) => Promise<boolean>;
 }
 
 const NewPayeeDialog = ({ isOpen, onClose, onAdd }: NewPayeeDialogProps) => {
@@ -17,11 +17,29 @@ const NewPayeeDialog = ({ isOpen, onClose, onAdd }: NewPayeeDialogProps) => {
   const [sortCode, setSortCode] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [nickname, setNickname] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const formatSortCode = (value: string): string => {
+    const digits = value.replace(/\D/g, '').slice(0, 6);
+    if (digits.length === 0) return '';
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return digits.slice(0, 2) + '-' + digits.slice(2);
+    return digits.slice(0, 2) + '-' + digits.slice(2, 4) + '-' + digits.slice(4, 6);
+  };
+
+  const handleSortCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatSortCode(e.target.value);
+    setSortCode(formatted);
+  };
+
+  const handleSubmit = async () => {
     if (!name || !sortCode || !accountNumber) return;
-    onAdd({ name, sortCode, accountNumber });
-    setStep('success');
+    setIsSubmitting(true);
+    const success = await onAdd({ name, sortCode, accountNumber });
+    setIsSubmitting(false);
+    if (success) {
+      setStep('success');
+    }
   };
 
   const handleClose = () => {
@@ -70,7 +88,8 @@ const NewPayeeDialog = ({ isOpen, onClose, onAdd }: NewPayeeDialogProps) => {
                   <Input
                     placeholder="12-34-56"
                     value={sortCode}
-                    onChange={(e) => setSortCode(e.target.value)}
+                    onChange={handleSortCodeChange}
+                    maxLength={8}
                   />
                 </div>
                 <div className="space-y-2">
@@ -85,9 +104,9 @@ const NewPayeeDialog = ({ isOpen, onClose, onAdd }: NewPayeeDialogProps) => {
               <Button 
                 onClick={handleSubmit} 
                 className="w-full"
-                disabled={!name || !sortCode || !accountNumber}
+                disabled={!name || !sortCode || !accountNumber || isSubmitting}
               >
-                Add Payee
+                {isSubmitting ? 'Adding...' : 'Add Payee'}
               </Button>
             </div>
           </>

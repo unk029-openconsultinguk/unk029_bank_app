@@ -90,10 +90,11 @@ WORKDIR ${APP_HOME}
 COPY --from=python_builder ${UV_PROJECT_ENVIRONMENT} ${UV_PROJECT_ENVIRONMENT}
 ENV PATH="${UV_PROJECT_ENVIRONMENT}/bin:${PATH}"
 
-# Copy only bank_app source files (unk029 comes from Nexus package)
+# Copy bank_app and local package source files
 COPY src/bank_app src/bank_app
+COPY src/unk029_local_package src/unk029_local_package
 
-# Add src to PYTHONPATH so bank_app module can be imported
+# Add src to PYTHONPATH so modules can be imported
 ENV PYTHONPATH="${APP_HOME}/src:${PYTHONPATH}"
 
 # Give access to the entire home folder to the new user so that files and folders can be written

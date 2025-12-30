@@ -10,8 +10,8 @@ from typing import Any
 from dotenv import load_dotenv
 import oracledb
 
-from unk029.exceptions import AccountNotFoundError, InsufficientFundsError
-from unk029.models import AccountCreate, Deposit, LoginRequest, PayeeCreate, Transfer, WithDraw
+from .exceptions import AccountNotFoundError, InsufficientFundsError
+from .models import AccountCreate, Deposit, LoginRequest, PayeeCreate, Transfer, WithDraw
 
 load_dotenv()
 
@@ -263,7 +263,7 @@ def get_transactions(
 
 def login_account(login: "LoginRequest", config: DatabaseConfig | None = None) -> dict[str, Any]:
     """Authenticate account with password using account_no or email."""
-    from unk029.exceptions import AccountNotFoundError, InvalidPasswordError
+    from .exceptions import AccountNotFoundError, InvalidPasswordError
 
     with get_cursor(config) as cur:
         if login.account_no is not None:
@@ -311,9 +311,6 @@ def add_payee(payee: "PayeeCreate", config: DatabaseConfig | None = None) -> dic
                 (user_account_no, payee_name, payee_account_no, payee_sort_code)
             VALUES 
                 (:user_account_no, :payee_name, :payee_account_no, :payee_sort_code)
-            RETURNING 
-                id, user_account_no, payee_name, payee_account_no, 
-                payee_sort_code, created_at
             """,
             {
                 "user_account_no": payee.user_account_no,
@@ -322,10 +319,12 @@ def add_payee(payee: "PayeeCreate", config: DatabaseConfig | None = None) -> dic
                 "payee_sort_code": payee.payee_sort_code,
             },
         )
-        row = cur.fetchone()
-        if cur.description is None:
-            return {}
-        return dict(zip([d[0].lower() for d in cur.description], row, strict=False))
+        return {
+            "user_account_no": payee.user_account_no,
+            "payee_name": payee.payee_name,
+            "payee_account_no": payee.payee_account_no,
+            "payee_sort_code": payee.payee_sort_code,
+        }
 
 
 def list_payees(
